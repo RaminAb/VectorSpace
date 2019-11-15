@@ -62,11 +62,26 @@ class vector:
 def vectors(array,space):
     return list(map(lambda x: vector(x,space) , array))
 
+
 def zerov(space):
     if re.match(r'F.',space):
         return vector([0]*getD(space),space)
     if re.match(r'C.',space):
-        return vector([0],space)
+        return vector([0],space) 
+
+def eye(space):
+    n = getD(space)
+    I = invMat(sym.eye(n),basis(space),basis(space))
+    return I
+
+def basis(space):
+    n = getD(space)
+    if re.match(r'F.',space):
+        base = sym.Matrix.diag([1]*n)
+        return vectors([base.row(i)[:] for i in range(n)],space)
+    if re.match(r'C.',space):
+        x = sym.Symbol('x')
+        return vectors([x**i for i in range(n)],space)
 
 def Gramm(base):
     eBase = base.copy()
@@ -75,6 +90,7 @@ def Gramm(base):
         eBase[i] = (base[i]- sum([base[i].innerproduct(eBase[j])*eBase[j]\
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
+
 def Vec(vec,base):
     n = len(base)
     eBase = Gramm(basis(vec.space))
@@ -100,18 +116,11 @@ def invMat(mat,vBase,wBase):
         vx = vector(x,vBase[0].space)
         x_vec = Vec(vx,vBase)
         return (invVec(mat*x_vec,wBase)).vec
-    return linMap(F,vBase[0].space,wBase[0].space)
+    if vBase[0].space == wBase[0].space:
+        return operator(F,vBase[0].space)
+    else:    
+        return linMap(F,vBase[0].space,wBase[0].space)
     
-
-def basis(space):
-    n = getD(space)
-    if re.match(r'F.',space):
-        base = sym.Matrix.diag([1]*n)
-        return vectors([base.row(i)[:] for i in range(n)],space)
-    if re.match(r'C.',space):
-        x = sym.Symbol('x')
-        return vectors([x**i for i in range(n)],space)
-
 def getD(space):
     return int(re.search(r'\d',space).group())
     
@@ -120,3 +129,34 @@ def Adj(linMap):
     wBase = basis(linMap.W)
     return invMat(sym.Matrix.adjoint(Mat(linMap,vBase,wBase)),wBase,vBase)
 
+def U(vBase,wBase):
+    return Mat(eye(vBase[0].space),vBase,wBase)
+
+def isindep(bList):
+    M = sym.Matrix.hstack(*list(map(lambda x : sym.Matrix(x.vec),bList)))
+    if  M.det() == 0:
+        return 0
+    else:
+        return 1
+
+def Exp(poly,op):
+    coef = poly.all_coeffs()
+    exp = [c*op**i for (c,i) in zip(coef,range(len(coef)-1,0,-1))]
+    exp.append(coef[-1]*sym.eye(op.shape[0]))
+    return sum(exp,sym.zeros(op.shape[0]))
+
+def gen_eigenvects(mat):
+    E = mat.eigenvals()
+    x = sym.Symbol('x')
+    gen_eigvec = {}
+    gen_eigval = {}
+    for egvl in E.keys():
+        geo_mlt = len(Exp(sym.Poly(x-egvl,x),mat).nullspace())
+        for i in range(E[egvl]):
+            gen_eigvec[egvl] = Exp(sym.Poly(x-egvl,x)**(i+1),mat).nullspace()
+            if len(gen_eigvec[egvl]) == E[egvl]:
+                gen_eigval[egvl] = (E[egvl],geo_mlt,i + 1)
+                break
+    flatten = lambda l: [item for sublist in l for item in sublist]
+    
+    return flatten(list(gen_eigvec.values())),gen_eigval
