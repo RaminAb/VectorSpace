@@ -1,5 +1,7 @@
 import sympy as sym
 import numpy as np
+import scipy.linalg as la
+import scipy as sp
 import re
 
 #################    
@@ -139,24 +141,37 @@ def isindep(bList):
     else:
         return 1
 
-def Exp(poly,op):
-    coef = poly.all_coeffs()
-    exp = [c*op**i for (c,i) in zip(coef,range(len(coef)-1,0,-1))]
-    exp.append(coef[-1]*sym.eye(op.shape[0]))
-    return sum(exp,sym.zeros(op.shape[0]))
+
+#################    
+# Scipy ################################################################
+#################
+def realize(mat):
+    if sp.array_equal(sp.real(mat),mat):
+        return sp.real(mat)
+    return mat
 
 def gen_eigenvects(mat):
-    E = mat.eigenvals()
-    x = sym.Symbol('x')
+    Eigen = la.eig(mat)
+    eigval = sp.unique(Eigen[0])
     gen_eigvec = {}
     gen_eigval = {}
-    for egvl in E.keys():
-        geo_mlt = len(Exp(sym.Poly(x-egvl,x),mat).nullspace())
-        for i in range(E[egvl]):
-            gen_eigvec[egvl] = Exp(sym.Poly(x-egvl,x)**(i+1),mat).nullspace()
-            if len(gen_eigvec[egvl]) == E[egvl]:
-                gen_eigval[egvl] = (E[egvl],geo_mlt,i + 1)
+    for ev in eigval:
+        nil = mat - ev*sp.eye(mat.shape[0])
+        alg_mlt = len(sp.where(Eigen[0] == ev)[0])
+        geo_mlt = la.null_space(nil).shape[1]
+        for i in range(alg_mlt):
+            gen_eigvec[ev] = la.null_space(la.fractional_matrix_power(nil,i+1))
+            if gen_eigvec[ev].shape[1] == alg_mlt:
+                gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
-    flatten = lambda l: [item for sublist in l for item in sublist]
-    Evec = [vec.normalized() for vec in flatten(list(gen_eigvec.values()))]
-    return Evec,gen_eigval
+    eigvec = sp.concatenate(list(gen_eigvec.values()),axis = 1)
+    return realize(sp.unique(eigvec,axis=1)), gen_eigval
+
+def diagonalize(mat):
+    Evec, Eval = gen_eigenvects(mat)
+    mat_gg = la.inv(Evec).dot(mat).dot(Evec)
+    mat_gg [sp.absolute(mat_gg) < 1e-10] = 0
+    return mat_gg
+
+def Jordan(mat):
+    pass
