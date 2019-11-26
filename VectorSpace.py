@@ -158,5 +158,5 @@ def gen_eigenvects(mat):
                 gen_eigval[egvl] = (E[egvl],geo_mlt,i + 1)
                 break
     flatten = lambda l: [item for sublist in l for item in sublist]
-    
-    return flatten(list(gen_eigvec.values())),gen_eigval
+    Evec = [vec.normalized() for vec in flatten(list(gen_eigvec.values()))]
+    return Evec,gen_eigval
