@@ -1,7 +1,6 @@
 import sympy as sym
 import numpy as np
 import scipy.linalg as la
-import scipy as sp
 import re
 
 #################    
@@ -145,33 +144,49 @@ def isindep(bList):
 #################    
 # Scipy ################################################################
 #################
+eps = 1e-10
+
+def makebasis(arr):
+    basis = arr[:,0][:,np.newaxis]
+    i = 1
+    while basis.shape[1] < basis.shape[0]:
+        cmat = np.concatenate([basis,arr[:,i][:,np.newaxis]],axis=1)
+        idx = basis.shape[1]+1
+        if np.abs(np.linalg.det(cmat[:idx,:idx])) > eps :
+            basis = cmat
+        i = i+1
+    return basis
+    
 def realize(mat):
-    if sp.array_equal(sp.real(mat),mat):
-        return sp.real(mat)
+    mat.real[np.absolute(np.real(mat))< eps]=0
+    if np.array_equal(np.real(mat),mat):
+        return np.real(mat)
+    else:
+        mat.imag[np.absolute(np.imag(mat))< eps]=0
     return mat
 
 def gen_eigenvects(mat):
     Eigen = la.eig(mat)
-    eigval = sp.unique(Eigen[0])
-    gen_eigvec = {}
+    eigval = np.unique(Eigen[0])
+    gen_eigvec = []
     gen_eigval = {}
     for ev in eigval:
-        nil = mat - ev*sp.eye(mat.shape[0])
-        alg_mlt = len(sp.where(Eigen[0] == ev)[0])
+        nil = mat - ev*np.eye(mat.shape[0])
+        alg_mlt = len(np.where(Eigen[0] == ev)[0])
         geo_mlt = la.null_space(nil).shape[1]
         for i in range(alg_mlt):
-            gen_eigvec[ev] = la.null_space(la.fractional_matrix_power(nil,i+1))
-            if gen_eigvec[ev].shape[1] == alg_mlt:
+            G = la.null_space(la.fractional_matrix_power(nil,i+1))
+            gen_eigvec.append(G)
+            if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
-    eigvec = sp.concatenate(list(gen_eigvec.values()),axis = 1)
-    return realize(sp.unique(eigvec,axis=1)), gen_eigval
+    gen_eigvec = makebasis(realize(np.concatenate(gen_eigvec,axis=1)))
+    return gen_eigvec, gen_eigval
 
 def diagonalize(mat):
     Evec, Eval = gen_eigenvects(mat)
-    mat_gg = la.inv(Evec).dot(mat).dot(Evec)
-    mat_gg [sp.absolute(mat_gg) < 1e-10] = 0
-    return mat_gg
+    Mat = la.inv(Evec).dot(mat).dot(Evec)
+    return realize(Mat)
 
 def Jordan(mat):
     pass
