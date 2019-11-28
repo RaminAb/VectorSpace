@@ -146,13 +146,12 @@ def isindep(bList):
 #################
 eps = 1e-10
 
-def makebasis(arr):
+def makebasis(arr,n):
     basis = arr[:,0][:,np.newaxis]
     i = 1
-    while basis.shape[1] < basis.shape[0]:
+    while basis.shape[1] < n:
         cmat = np.concatenate([basis,arr[:,i][:,np.newaxis]],axis=1)
-        idx = basis.shape[1]+1
-        if np.abs(np.linalg.det(cmat[:idx,:idx])) > eps :
+        if np.abs(np.linalg.det(cmat.transpose().dot(cmat))) > eps :
             basis = cmat
         i = i+1
     return basis
@@ -168,25 +167,32 @@ def realize(mat):
 def gen_eigenvects(mat):
     Eigen = la.eig(mat)
     eigval = np.unique(Eigen[0])
-    gen_eigvec = []
+    gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
+        eigvec = []
         nil = mat - ev*np.eye(mat.shape[0])
         alg_mlt = len(np.where(Eigen[0] == ev)[0])
         geo_mlt = la.null_space(nil).shape[1]
         for i in range(alg_mlt):
             G = la.null_space(la.fractional_matrix_power(nil,i+1))
-            gen_eigvec.append(G)
+            eigvec.append(G)
             if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
-    gen_eigvec = makebasis(realize(np.concatenate(gen_eigvec,axis=1)))
+        gen_eigvec[ev] = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
+#    gen_eigvec = makebasis(realize(np.concatenate(gen_eigvec,axis=1)))
     return gen_eigvec, gen_eigval
 
 def diagonalize(mat):
     Evec, Eval = gen_eigenvects(mat)
-    Mat = la.inv(Evec).dot(mat).dot(Evec)
+    U = np.concatenate(list(Evec.values()),axis=1)
+    Mat = la.inv(U).dot(mat).dot(U)
     return realize(Mat)
 
 def Jordan(mat):
-    pass
+    Evec, Eval = gen_eigenvects(mat)
+    v = sum(Evec.transpose())[:,np.newaxis]
+    for ev in Eval.keys():
+        for i in range(Eval[ev][2]):
+            pass
