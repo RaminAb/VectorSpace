@@ -166,13 +166,13 @@ def realize(mat):
 
 def gen_eigenvects(mat):
     Eigen = la.eig(mat)
-    eigval = np.unique(Eigen[0])
+    eigval = np.unique(np.around(Eigen[0],15))
     gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
         eigvec = []
         nil = mat - ev*np.eye(mat.shape[0])
-        alg_mlt = len(np.where(Eigen[0] == ev)[0])
+        alg_mlt = len(np.where(np.abs(Eigen[0]-ev)<eps)[0])
         geo_mlt = la.null_space(nil).shape[1]
         for i in range(alg_mlt):
             G = la.null_space(la.fractional_matrix_power(nil,i+1))
