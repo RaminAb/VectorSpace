@@ -181,8 +181,18 @@ def gen_eigenvects(mat):
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
         gen_eigvec[ev] = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
-#    gen_eigvec = makebasis(realize(np.concatenate(gen_eigvec,axis=1)))
     return gen_eigvec, gen_eigval
+
+def JordanBasis(mat):
+    Evec, Eval = gen_eigenvects(mat)
+    Jb = {}
+    for ev in Eval.keys():
+        v = Evec[ev][:,-1][:,np.newaxis]
+        Jb[ev] = []
+        for i in range(Eval[ev][2]):
+            Jb[ev].append(np.linalg.matrix_power(mat-ev*np.eye(mat.shape[0]),i).dot(v))
+        Jb[ev] = realize(np.concatenate(Jb[ev],axis=1))[:,::-1]
+    return np.concatenate(list(Jb.values()),axis = 1)
 
 def diagonalize(mat):
     Evec, Eval = gen_eigenvects(mat)
@@ -191,8 +201,7 @@ def diagonalize(mat):
     return realize(Mat)
 
 def Jordan(mat):
-    Evec, Eval = gen_eigenvects(mat)
-    v = sum(Evec.transpose())[:,np.newaxis]
-    for ev in Eval.keys():
-        for i in range(Eval[ev][2]):
-            pass
+    U = JordanBasis(mat)
+    Mat = la.inv(U).dot(mat).dot(U)
+    return realize(Mat)
+
