@@ -164,9 +164,10 @@ def realize(mat):
         mat.imag[np.absolute(np.imag(mat))< eps]=0
     return mat
 
-def gen_eigenvects(mat):
+def eig(mat):
     Eigen = la.eig(mat)
-    eigval = np.unique(np.around(Eigen[0],15))
+    eigval = np.sort(Eigen[0])[::-1]
+#    eigval = (Eigen[0])
     gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
@@ -175,16 +176,17 @@ def gen_eigenvects(mat):
         alg_mlt = len(np.where(np.abs(Eigen[0]-ev)<eps)[0])
         geo_mlt = la.null_space(nil).shape[1]
         for i in range(alg_mlt):
-            G = la.null_space(la.fractional_matrix_power(nil,i+1))
+            G = la.null_space(la.fractional_matrix_power(nil,i+1),rcond = eps)
             eigvec.append(G)
             if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
         gen_eigvec[ev] = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
+
     return gen_eigvec, gen_eigval
 
 def JordanBasis(mat):
-    Evec, Eval = gen_eigenvects(mat)
+    Evec, Eval = eig(mat)
     Jb = {}
     for ev in Eval.keys():
         v = Evec[ev][:,-1][:,np.newaxis]
@@ -195,7 +197,7 @@ def JordanBasis(mat):
     return np.concatenate(list(Jb.values()),axis = 1)
 
 def diagonalize(mat):
-    Evec, Eval = gen_eigenvects(mat)
+    Evec, Eval = eig(mat)
     U = np.concatenate(list(Evec.values()),axis=1)
     Mat = la.inv(U).dot(mat).dot(U)
     return realize(Mat)
