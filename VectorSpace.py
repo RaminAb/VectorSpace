@@ -189,10 +189,12 @@ def JordanBasis(mat):
     Evec, Eval = eig(mat)
     Jb = {}
     for ev in Eval.keys():
-        v = Evec[ev][:,-1][:,np.newaxis]
         Jb[ev] = []
-        for i in range(Eval[ev][2]):
-            Jb[ev].append(np.linalg.matrix_power(mat-ev*np.eye(mat.shape[0]),i).dot(v))
+        for k in range(1,Eval[ev][1]+1):
+            v = Evec[ev][:,-k][:,np.newaxis]
+            for i in range(Eval[ev][2]):
+                nv = np.linalg.matrix_power(mat-ev*np.eye(mat.shape[0]),i).dot(v)
+                Jb[ev].append(nv)
         Jb[ev] = realize(np.concatenate(Jb[ev],axis=1))[:,::-1]
     return np.concatenate(list(Jb.values()),axis = 1)
 
@@ -205,5 +207,5 @@ def diagonalize(mat):
 def Jordan(mat):
     U = JordanBasis(mat)
     Mat = la.inv(U).dot(mat).dot(U)
-    return realize(Mat)
+    return U,realize(Mat)
 
