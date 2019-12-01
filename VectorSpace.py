@@ -146,6 +146,16 @@ def isindep(bList):
 #################
 eps = 1e-10
 
+def orderbasis(oldBasis,geo_mlt):
+    newBasis = oldBasis[:,0][:,np.newaxis]
+    idx = geo_mlt
+    for i in range(geo_mlt):
+        while idx < oldBasis.shape[1]:
+            newBasis = np.concatenate([newBasis,oldBasis[:,idx][:,None]],axis=1)
+            idx += geo_mlt
+        idx = i+1
+    return newBasis
+
 def makebasis(arr,n):
     basis = arr[:,0][:,np.newaxis]
     i = 1
@@ -163,7 +173,7 @@ def realize(mat):
     else:
         mat.imag[np.absolute(np.imag(mat))< eps]=0
     return mat
-
+    
 def eig(mat):
     Eigen = la.eig(mat)
     eigval = np.sort(Eigen[0])[::-1]
@@ -174,14 +184,15 @@ def eig(mat):
         eigvec = []
         nil = mat - ev*np.eye(mat.shape[0])
         alg_mlt = len(np.where(np.abs(Eigen[0]-ev)<eps)[0])
-        geo_mlt = la.null_space(nil).shape[1]
+        geo_mlt = la.null_space(nil,rcond = eps).shape[1]
         for i in range(alg_mlt):
-            G = la.null_space(la.fractional_matrix_power(nil,i+1),rcond = eps)
+            G = la.null_space(np.linalg.matrix_power(nil,i+1),rcond = eps)
             eigvec.append(G)
             if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
-        gen_eigvec[ev] = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
+        base = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
+        gen_eigvec[ev] = orderbasis(base,geo_mlt)
 
     return gen_eigvec, gen_eigval
 
