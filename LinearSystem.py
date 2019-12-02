@@ -5,9 +5,6 @@ from numpy import math as mth
 import scipy.linalg as la
 
 def MatFun(mat,f,x):
-#    Evec, Eval = vs.eig(mat,'J')
-#    U = np.concatenate(list(Evec.values()),axis=1)
-#    Mat = la.inv(U).dot(mat).dot(U)
     idx = [0]
     U, Mat = vs.Transform(mat,'J')
     for i in range(1,Mat.shape[1]):

@@ -157,7 +157,7 @@ def eig(mat,mode = 'D'):
         alg_mlt = len(np.where(np.abs(Eigen[0]-ev)<eps)[0])
         geo_mlt = la.null_space(nil,rcond = eps).shape[1]
         for i in range(alg_mlt):
-            G = la.null_space(np.linalg.matrix_power(nil,i+1),rcond = eps)
+            G = la.null_space(realize(np.linalg.matrix_power(nil,i+1)),rcond = eps)
             eigvec.append(G)
             if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
