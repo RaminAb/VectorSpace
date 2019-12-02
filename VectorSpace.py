@@ -176,7 +176,7 @@ def GenEigen(Base,nil,num,mode):
     for i in range(len(vList)):
         for n in range(1,nil_pwr+1):
             w = np.linalg.matrix_power(nil,n).dot(vList[i])
-            if (w == 0).all():
+            if (realize(w) == 0).all():
                 idx.append((i,n))
                 break
     idx_eig = [i for i, x in enumerate(idx) if x[1] == 1]
