@@ -146,38 +146,9 @@ def isindep(bList):
 #################
 eps = 1e-10
 
-def orderbasis(oldBasis,geo_mlt):
-    newBasis = oldBasis[:,0][:,np.newaxis]
-    idx = geo_mlt
-    for i in range(geo_mlt):
-        while idx < oldBasis.shape[1]:
-            newBasis = np.concatenate([newBasis,oldBasis[:,idx][:,None]],axis=1)
-            idx += geo_mlt
-        idx = i+1
-    return newBasis
-
-def makebasis(arr,n):
-    basis = arr[:,0][:,np.newaxis]
-    i = 1
-    while basis.shape[1] < n:
-        cmat = np.concatenate([basis,arr[:,i][:,np.newaxis]],axis=1)
-        if np.abs(np.linalg.det(cmat.transpose().dot(cmat))) > eps :
-            basis = cmat
-        i = i+1
-    return basis
-    
-def realize(mat):
-    mat.real[np.absolute(np.real(mat))< eps]=0
-    if np.array_equal(np.real(mat),mat):
-        return np.real(mat)
-    else:
-        mat.imag[np.absolute(np.imag(mat))< eps]=0
-    return mat
-    
-def eig(mat):
+def eig(mat,mode = 'D'):
     Eigen = la.eig(mat)
-    eigval = np.sort(Eigen[0])[::-1]
-#    eigval = (Eigen[0])
+    eigval = np.sort(np.unique(Eigen[0]))[::-1]
     gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
@@ -192,31 +163,69 @@ def eig(mat):
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
         base = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
-        gen_eigvec[ev] = orderbasis(base,geo_mlt)
-
+        gen_eigvec[ev] = GenEigen(base,nil,gen_eigval[ev],mode)
     return gen_eigvec, gen_eigval
 
-def JordanBasis(mat):
-    Evec, Eval = eig(mat)
-    Jb = {}
-    for ev in Eval.keys():
-        Jb[ev] = []
-        for k in range(1,Eval[ev][1]+1):
-            v = Evec[ev][:,-k][:,np.newaxis]
-            for i in range(Eval[ev][2]):
-                nv = np.linalg.matrix_power(mat-ev*np.eye(mat.shape[0]),i).dot(v)
-                Jb[ev].append(nv)
-        Jb[ev] = realize(np.concatenate(Jb[ev],axis=1))[:,::-1]
-    return np.concatenate(list(Jb.values()),axis = 1)
+def GenEigen(Base,nil,num,mode):
 
-def diagonalize(mat):
-    Evec, Eval = eig(mat)
+    alg_mlt, geo_mlt, nil_pwr = num
+    vList = np.hsplit(Base,Base.shape[1])
+    idx = []
+    G = {}
+    J = []
+    for i in range(len(vList)):
+        for n in range(1,nil_pwr+1):
+            w = np.linalg.matrix_power(nil,n).dot(vList[i])
+            if (w == 0).all():
+                idx.append((i,n))
+                break
+    idx_eig = [i for i, x in enumerate(idx) if x[1] == 1]
+    
+    for indice in idx_eig:
+        G[indice] = [vList[indice]]
+        for i,v in enumerate(vList):
+            w = np.linalg.matrix_power(nil,idx[i][1]-1).dot(v)
+            cmat = np.concatenate([vList[indice],w],axis = 1)
+            det = np.abs(np.linalg.det(cmat.transpose().dot(cmat)))
+            if (det < eps) and idx[i][1]!=1 :
+                G[indice].append(vList[i])
+        G[indice] = np.concatenate(G[indice],axis=1)
+        
+    for i in G.keys():
+        for j in range(G[i].shape[1]):
+            Null = (np.linalg.matrix_power(nil,j).dot(G[i]))
+            J.append(Null[:,-1][:,np.newaxis])
+    J_Base = realize(np.concatenate(J[::-1],axis=1))
+    D_Base = np.concatenate(list(G.values()),axis = 1)
+    if mode == 'J':
+        return J_Base
+    elif mode == 'D':
+        return D_Base
+    else:
+        return D_Base
+       
+def makebasis(arr,n): 
+    base = arr[:,min(np.where((arr != 0))[1])][:,np.newaxis]
+    i = 1
+    while base.shape[1] < n:
+        cmat = np.concatenate([base,arr[:,i][:,np.newaxis]],axis=1)
+        if np.abs(np.linalg.det(cmat.transpose().dot(cmat))) > eps :
+            base = cmat
+        i = i+1
+    return base
+    
+def realize(mat):
+    mat.real[np.absolute(np.real(mat))< eps]=0
+    if np.array_equal(np.real(mat),mat):
+        return np.real(mat)
+    else:
+        mat.imag[np.absolute(np.imag(mat))< eps]=0
+    return mat
+
+def Transform(mat,form = 'D'):
+    Evec, Eval = eig(mat,form)
     U = np.concatenate(list(Evec.values()),axis=1)
     Mat = la.inv(U).dot(mat).dot(U)
-    return realize(Mat)
+    return U,realize(Mat)   
 
-def Jordan(mat):
-    U = JordanBasis(mat)
-    Mat = la.inv(U).dot(mat).dot(U)
-    return U,realize(Mat)
 
