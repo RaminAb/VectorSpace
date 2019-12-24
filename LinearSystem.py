@@ -14,15 +14,20 @@ def MatFun(mat,f,x):
     idx.append(Mat.shape[1])
     block_size = np.diff(idx)
     Block = []
+    n = 0
     for i in range(block_size.shape[0]):
         F = lambda ev,k: (sym.diff(f,x,k)/mth.factorial(k)).subs(x,ev)
-        F_M = sym.Matrix.diag(*[F(Mat[i,i],0)]*block_size[i])
+        F_M = sym.Matrix.diag(*[F(Mat[n,n],0)]*block_size[i])
         for k in range(1,block_size[i]):
             hpad = sym.Matrix(0,k,[])
             vpad = sym.Matrix(k,0,[])
-            F_M = F_M + sym.Matrix.diag(hpad,*[F(Mat[i,i],k)]*(block_size[i]-k),vpad)
+            F_M = F_M + sym.Matrix.diag(hpad,*[F(Mat[n,n],k)]*(block_size[i]-k),vpad)
         Block.append(F_M)
-    F_Mat = sym.Matrix.diag(*Block)
+        n += F_M.shape[0]
+    if not Block[0].free_symbols:
+        F_Mat = vs.realize(np.array(sym.Matrix.diag(*Block),dtype=complex))
+    else:
+        F_Mat = np.array(sym.Matrix.diag(*Block))
     F_mat = U.dot(F_Mat).dot(la.inv(U))
     
     return F_mat, F_Mat
@@ -51,10 +56,10 @@ def runsys(A,**kwargs):
         l = sym.Symbol('l')
         f = sym.exp(l*step)        
         Ad = MatFun(A,f,l)[0]
-        sol = np.zeros((2,time.shape[0]))
+        sol = np.zeros((A.shape[0],time.shape[0]))
         sol[:,0] = np.array([x0])
         for i in range(1,time.shape[0]):
-            sol[:,i] = np.squeeze(Ad.dot(sol[:,i-1][:,np.newaxis]))
+            sol[:,i] = np.reshape(Ad.dot(sol[:,i-1][:,np.newaxis]),(1,-1))
             
         sol = sol.transpose()
     if 'Jordan' in show:
@@ -65,4 +70,24 @@ def runsys(A,**kwargs):
         f = sym.exp(L*T)
         print(MatFun(A,f,L)[1])
 
+    return sol
+def MatIntegral(matFunc,symbol,t0,t):
+    MatFunc = sym.Matrix(np.reshape(matFunc,(1,-1)))
+    res = []
+    for i,func in enumerate(MatFunc):
+        Integrand = lambda  x: func.subs(symbol,x).evalf()
+        res.append( integrate.quad(Integrand,t0,t)[0] )
+    return np.reshape(res,matFunc.shape)
+
+def MatImpulse(mat,time):
+    x = sym.Symbol('x')
+    t = sym.Symbol('t')
+    f = sym.exp(x*t)
+
+    fA = sym.Matrix(MatFun(mat,f,x)[0])
+    eval_fA = lambda tau: np.array(fA.subs(t,tau).evalf(),dtype = complex)
+
+    sol = list(map(eval_fA,time))
+    sol = list(map(lambda s: np.sum(s,axis=1)[np.newaxis,:], sol))
+    sol = vs.realize(np.concatenate(sol,axis=0))
     return sol

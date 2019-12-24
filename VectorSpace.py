@@ -119,7 +119,7 @@ def invMat(mat,vBase,wBase):
         return (invVec(mat*x_vec,wBase)).vec
     if vBase[0].space == wBase[0].space:
         return operator(F,vBase[0].space)
-    else:    
+    else:
         return linMap(F,vBase[0].space,wBase[0].space)
     
 def getD(space):
@@ -148,7 +148,8 @@ eps = 1e-10
 
 def eig(mat,mode = 'D'):
     Eigen = la.eig(mat)
-    eigval = np.sort(np.unique(Eigen[0]))[::-1]
+#    eigval = np.sort(np.unique(Eigen[0]))[::-1]
+    eigval = np.sort(np.unique(np.around(Eigen[0],decimals = 15)))[::-1]
     gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
