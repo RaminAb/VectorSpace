@@ -2,7 +2,7 @@ import sympy as sym
 import numpy as np
 import scipy.linalg as la
 import re
-
+sym.init_printing(pretty_print=False)
 #################    
 # Classes ################################################################
 #################
@@ -34,10 +34,12 @@ class linMap:
         return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
     def null(self):
         return [invVec(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
-    def eigenvals(self):
-        return Mat(self,basis(self.V),basis(self.W)).eigenvals()
-    def eigenvects(self):
-        return Mat(self,basis(self.V),basis(self.W)).eigenvects()
+    def eig(self):
+        M = Mat(self,basis(self.V),basis(self.W)).eigenvects()
+        mat = {}
+        for v in M:
+            mat[v[0]] = invVec(v[2][0],basis(self.V))
+        return mat
 
 class operator(linMap):
     def __init__(self,fun,V):
@@ -163,6 +165,9 @@ def isindep(bList):
         return 0
     else:
         return 1
+    
+def sym2num(Mat):
+    return np.array(Mat).astype(np.float64)
 
 
 #################    
