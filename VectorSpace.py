@@ -15,8 +15,29 @@ class linMap:
         self.dimension = (getD(V),getD(W))
     def __call__(self,v):
         return vector(self.fun(v.vec),self.W)
+    def __mul__(self,scalar):
+        return linMap(lambda x: scalar*self.fun(x),self.V,self.W)
+    __rmul__=__mul__
+    def __truediv__(self,scalar):
+        return linMap(lambda x: self.fun(x)/scalar,self.V,self.W)
+    def __add__(self,other):
+        return linMap(lambda x: self.fun(x)+other.fun(x),self.V,self.W)
+    def __sub__(self,other):
+        return linMap(lambda x: self.fun(x)-other.fun(x),self.V,self.W)
+    def __str__(self):
+        n = getD(self.V)
+        x = sym.symbols('x0:%d'%n)
+        return '{} : {} -> {} : {}'.format(type(self).__name__,self.V,self.W, self.fun(x))
+    def __repr__(self):
+        return str(self)
+    def prod(self,other):
+        return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
     def null(self):
         return [invVec(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
+    def eigenvals(self):
+        return Mat(self,basis(self.V),basis(self.W)).eigenvals()
+    def eigenvects(self):
+        return Mat(self,basis(self.V),basis(self.W)).eigenvects()
 
 class operator(linMap):
     def __init__(self,fun,V):
@@ -26,7 +47,7 @@ class vector:
     def __init__(self,array,space):
         if re.match(r'F.',space):
             self.vec = np.array(array)
-        if re.match(r'C.',space):
+        if re.match(r'P.',space):
             self.vec = array
         self.space = space
         self.dimension = getD(space)
@@ -46,7 +67,7 @@ class vector:
     def innerproduct(self,other):
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
-        if re.match(r'C.',self.space):
+        if re.match(r'P.',self.space):
             return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-1,1))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
@@ -67,7 +88,7 @@ def vectors(array,space):
 def zerov(space):
     if re.match(r'F.',space):
         return vector([0]*getD(space),space)
-    if re.match(r'C.',space):
+    if re.match(r'P.',space):
         return vector([0],space) 
 
 def eye(space):
@@ -80,7 +101,7 @@ def basis(space):
     if re.match(r'F.',space):
         base = sym.Matrix.diag([1]*n)
         return vectors([base.row(i)[:] for i in range(n)],space)
-    if re.match(r'C.',space):
+    if re.match(r'P.',space):
         x = sym.Symbol('x')
         return vectors([x**i for i in range(n)],space)
 
@@ -110,7 +131,8 @@ def invVec(mat,base):
         return zerov(base[0].space,len(base))
 
 def Mat(lMap,vBase,wBase):
-    return sym.Matrix.hstack(*[Vec(lMap(VBase),wBase) for VBase in vBase])
+    mat = sym.Matrix.hstack(*[Vec(lMap(VBase),wBase) for VBase in vBase])
+    return np.array(mat).astype(np.float64)
 
 def invMat(mat,vBase,wBase):
     def F(x):
@@ -123,7 +145,10 @@ def invMat(mat,vBase,wBase):
         return linMap(F,vBase[0].space,wBase[0].space)
     
 def getD(space):
-    return int(re.search(r'\d',space).group())
+    if re.match(r'F.',space):
+        return int(re.search(r'\d',space).group())
+    if re.match(r'P.',space):
+        return int(re.search(r'\d',space).group())+1
     
 def Adj(linMap):
     vBase = basis(linMap.V)
