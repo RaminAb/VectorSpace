@@ -25,20 +25,23 @@ class linMap:
     def __sub__(self,other):
         return linMap(lambda x: self.fun(x)-other.fun(x),self.V,self.W)
     def __str__(self):
-        n = getD(self.V)
-        x = sym.symbols('x0:%d'%n)
-        return '{} : {} -> {} : {}'.format(type(self).__name__,self.V,self.W, self.fun(x))
+        if re.match(r'F.',self.V):
+            n = getD(self.V)
+            z = sym.symbols('z0:%d'%n)
+            return '{}({}->{}) : {} -> {}'.format(type(self).__name__,self.V,self.W,z, self.fun(z))
+        if re.match(r'P.',self.V):
+            return '{}({}->{}) : {}'.format(type(self).__name__,self.V,self.W,self.fun.__doc__)
     def __repr__(self):
         return str(self)
     def prod(self,other):
         return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
     def null(self):
-        return [invVec(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
+        return [invMatv(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
     def eig(self):
         M = Mat(self,basis(self.V),basis(self.W)).eigenvects()
         mat = {}
         for v in M:
-            mat[v[0]] = invVec(v[2][0],basis(self.V))
+            mat[v[0]] = invMatv(v[2][0],basis(self.V))
         return mat
 
 class operator(linMap):
@@ -115,7 +118,7 @@ def Gramm(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
-def Vec(vec,base):
+def Matv(vec,base):
     n = len(base)
     eBase = Gramm(basis(vec.space))
     X = sym.symbols('x0:%d'%n)
@@ -126,20 +129,21 @@ def Vec(vec,base):
     sol = sym.solve(Eq,X)
     return sym.Matrix([sol[X[i]] for i in range(n)])
 
-def invVec(mat,base):
+def invMatv(mat,base):
     if mat != []:
         return vector(sum([mat[i]*base[i].vec for i in range(len(base))]),base[0].space)
     else:
-        return zerov(base[0].space,len(base))
+        return zerov(base[0].space)
 
 def Mat(lMap,vBase,wBase):
-    return sym.Matrix.hstack(*[Vec(lMap(VBase),wBase) for VBase in vBase])
+    return sym.Matrix.hstack(*[Matv(lMap(VBase),wBase) for VBase in vBase])
 
 def invMat(mat,vBase,wBase):
     def F(x):
+        ''' Unknown '''
         vx = vector(x,vBase[0].space)
-        x_vec = Vec(vx,vBase)
-        return (invVec(mat*x_vec,wBase)).vec
+        x_vec = Matv(vx,vBase)
+        return (invMatv(mat*x_vec,wBase)).vec
     if vBase[0].space == wBase[0].space:
         return operator(F,vBase[0].space)
     else:
