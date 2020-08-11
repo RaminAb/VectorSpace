@@ -131,8 +131,7 @@ def invVec(mat,base):
         return zerov(base[0].space,len(base))
 
 def Mat(lMap,vBase,wBase):
-    mat = sym.Matrix.hstack(*[Vec(lMap(VBase),wBase) for VBase in vBase])
-    return np.array(mat).astype(np.float64)
+    return sym.Matrix.hstack(*[Vec(lMap(VBase),wBase) for VBase in vBase])
 
 def invMat(mat,vBase,wBase):
     def F(x):
