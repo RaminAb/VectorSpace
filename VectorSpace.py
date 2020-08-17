@@ -1,18 +1,122 @@
+"""
+Credit : Ramin Abbasi
+Update : 08/17/2020
+========================
+Vector Space (VS) Package
+========================
+This package includes tools from linear algebra to work on linear maps and
+matrices. It requires sympy, numpy, scipy, and re packages. 
+
+
+Classes
+=======
+VS includes two main classes:
+    1) linMap (and operator)
+    2) vector
+
+linMap
+------
+It generates a linear map object (V -> W) with four attributes:
+    1) fun: fun: sets the functionality of linear map
+    2) V: str: sets the vector space V (e.g F3,P2)
+    3) W: str: sets the vector space W (e.g F5,P1)
+and the following methods:
+    1) prod : to multiply two linMaps
+    2) null : returns the null of a linMap
+    3) eig  : returns the eigenval, eigenvec of linMap
+    
+vector
+------  
+It generates a vector object with three attributes:
+    1) vec: array:  sets the array from which the vector is built (e.g [1,2,3])
+    2) space: str:  sets the space in which the vector is built (e.g F3)
+and the following methods:
+    1) innerproduct : returns the innerproduct of two vectors (standard def)
+    2) norm : returns the norm of a vector based on defined innerproduct
+    3) normalize : normalizes a vector
+    4) initial : sets the vector to zero
+
+    
+Functions on Linear Maps
+========================
+
+vectors(array,space) - generate a list of vectors from 'array' in 'space'
+zerov(space) - generates a zero vector in 'space'
+eye(space) - generate identity map on 'space'
+basis(space) - generate standard basis on 'space'
+Gramm(base) - generate an orthonormal basis from 'base' using Gram-Shmidt
+Matv(vec,base) - returns the matrix of 'vec' using 'base'
+InvMatv(mat,base) - returns the vector of 'mat' using 'base'
+Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wBase'
+invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
+getD(space) - returns the dimension of 'space'
+Adj(linMap) - returns the adjoint of 'linMap'
+U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
+isindep(bList) - checks the linear independence of 'bList'
+sym2num(Mat) - turns the sympy matrix into numpy array
+
+Functions on Matrices
+=====================
+
+
+Public methods
+--------------
+eig(mat,mode) - calculates eigenvalues and generalized eigenvectors  
+
+    Inputs: (mat,mode)
+    -------
+    mat  - input matrix
+    mode - specifies the structure (D = Diagonal, J = Jordan)
+
+    output: (gen_eigvec,gen_eigval)
+    -------
+    gen_eigval : returns 'a : (b,c,d)', where
+        a : eigenvalue of 'mat'
+        b : algebraic multiplicity of a
+        c : geometric multiplicity of a
+        d : the power of (z-a) in minimum polynomial
+    gen_eigvec : returns '{a : array}'
+        a : eigenvalue of 'mat'
+        array : generalized eigenvectors of a
+    
+
+Transform(mat,form,field) - Transforms the matrix into a desired form
+    
+    Input: (mat,form,field)
+    ------
+    mat  : input matrix
+    form : specifies the required form (D = Diagonal, J = Jordan)
+    field: specifies the working field (C = Complex, R = Real)
+
+    Output: (U,Mat)
+    U : transformation matrix
+    Mat : transformed matrix
+
+Private methods
+---------------
+_setR(gen_eigvec,gen_eigval) - restricts the basis computation to Field R
+_GenEigen(Base,nil,num,mode) - returns the correct basis for D or J form
+_makebasis(arr,n) - rearranges the basis to have a uniform structure
+_realize(mat) - turns a complex matrix 'mat' into real if possible
+"""
+
+
+
 import sympy as sym
 import numpy as np
 import scipy.linalg as la
 import re
 sym.init_printing(pretty_print=False)
-#################    
-# Classes ################################################################
-#################
+
+#========================================================================= 
+# Classes
+#========================================================================= 
 
 class linMap:
     def __init__(self,fun,V,W):
         self.fun = fun
         self.V = V
         self.W = W
-        self.dimension = (getD(V),getD(W))
     def __call__(self,v):
         return vector(self.fun(v.vec),self.W)
     def __mul__(self,scalar):
@@ -55,7 +159,6 @@ class vector:
         if re.match(r'P.',space):
             self.vec = array
         self.space = space
-        self.dimension = getD(space)
     def __mul__(self,scalar):
         return vector(self.vec*scalar,self.space)
     __rmul__=__mul__
@@ -73,7 +176,7 @@ class vector:
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
         if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-1,1))
+            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-sym.pi,sym.pi))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
     def normalize(self):
@@ -82,9 +185,9 @@ class vector:
         return vector(self.vec-self.vec,self.space)
 
     
-#################    
-# Functions ################################################################
-#################
+#========================================================================= 
+# Linear Map Functions
+#========================================================================= 
         
 def vectors(array,space):
     return list(map(lambda x: vector(x,space) , array))
@@ -174,9 +277,9 @@ def sym2num(Mat):
     return np.array(Mat).astype(np.float64)
 
 
-#################    
-# Scipy ################################################################
-#################
+#========================================================================= 
+# Matrix Functions
+#========================================================================= 
 eps = 1e-10
 
 def eig(mat,mode = 'D'):
@@ -191,16 +294,30 @@ def eig(mat,mode = 'D'):
         alg_mlt = len(np.where(np.abs(Eigen[0]-ev)<eps)[0])
         geo_mlt = la.null_space(nil,rcond = eps).shape[1]
         for i in range(alg_mlt):
-            G = la.null_space(realize(np.linalg.matrix_power(nil,i+1)),rcond = eps)
+            G = la.null_space(_realize(np.linalg.matrix_power(nil,i+1)),rcond = eps)
             eigvec.append(G)
             if G.shape[1] == alg_mlt:
                 gen_eigval[ev] = (alg_mlt,geo_mlt,i+1)
                 break
-        base = makebasis(realize(np.concatenate(eigvec,axis=1)),alg_mlt)
-        gen_eigvec[ev] = GenEigen(base,nil,gen_eigval[ev],mode)
+        base = _makebasis(_realize(np.concatenate(eigvec,axis=1)),alg_mlt)
+        gen_eigvec[ev] = _GenEigen(base,nil,gen_eigval[ev],mode)
     return gen_eigvec, gen_eigval
 
-def GenEigen(Base,nil,num,mode):
+def _setR(gen_eigvec,gen_eigval):
+    num = 1
+    for ev in gen_eigvec.keys():
+        print(ev.imag)
+        if not(abs(ev.imag-0)<eps):
+            if num == 1:
+                gen_eigvec[ev] = 2*gen_eigvec[ev].real
+                num = num + 1
+            else:
+                gen_eigvec[ev] = 2*gen_eigvec[ev].imag
+                num = num + 1
+        if num == 3: num = 1
+    return gen_eigvec, gen_eigval
+
+def _GenEigen(Base,nil,num,mode):
 
     alg_mlt, geo_mlt, nil_pwr = num
     vList = np.hsplit(Base,Base.shape[1])
@@ -210,7 +327,7 @@ def GenEigen(Base,nil,num,mode):
     for i in range(len(vList)):
         for n in range(1,nil_pwr+1):
             w = np.linalg.matrix_power(nil,n).dot(vList[i])
-            if (realize(w) == 0).all():
+            if (_realize(w) == 0).all():
                 idx.append((i,n))
                 break
     idx_eig = [i for i, x in enumerate(idx) if x[1] == 1]
@@ -229,7 +346,7 @@ def GenEigen(Base,nil,num,mode):
         for j in range(G[i].shape[1]):
             Null = (np.linalg.matrix_power(nil,j).dot(G[i]))
             J.append(Null[:,-1][:,np.newaxis])
-    J_Base = realize(np.concatenate(J[::-1],axis=1))
+    J_Base = _realize(np.concatenate(J[::-1],axis=1))
     D_Base = np.concatenate(list(G.values()),axis = 1)
     if mode == 'J':
         return J_Base
@@ -238,7 +355,7 @@ def GenEigen(Base,nil,num,mode):
     else:
         return D_Base
        
-def makebasis(arr,n): 
+def _makebasis(arr,n): 
     base = arr[:,min(np.where((arr != 0))[1])][:,np.newaxis]
     i = 1
     while base.shape[1] < n:
@@ -248,7 +365,7 @@ def makebasis(arr,n):
         i = i+1
     return base
     
-def realize(mat):
+def _realize(mat):
     mat.real[np.absolute(np.real(mat))< eps]=0
     if np.array_equal(np.real(mat),mat):
         return np.real(mat)
@@ -256,10 +373,16 @@ def realize(mat):
         mat.imag[np.absolute(np.imag(mat))< eps]=0
     return mat
 
-def Transform(mat,form = 'D'):
-    Evec, Eval = eig(mat,form)
+def Transform(mat,form = 'D',field = 'C'):
+    if field == 'R':
+        Evec, Eval = _setR(*eig(mat,form))
+    elif field == 'C':
+        Evec, Eval = eig(mat,form)
+    else:
+        print('Field can only be C or R')
+        return 'Error';
     U = np.concatenate(list(Evec.values()),axis=1)
     Mat = la.inv(U).dot(mat).dot(U)
-    return U,realize(Mat)   
+    return U,_realize(Mat)   
 
 
