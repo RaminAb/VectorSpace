@@ -16,7 +16,7 @@ VS includes two main classes:
 
 linMap
 ------
-It generates a linear map object (V -> W) with four attributes:
+It generates a linear map object (V -> W) with three attributes:
     1) fun: fun: sets the functionality of linear map
     2) V: str: sets the vector space V (e.g F3,P2)
     3) W: str: sets the vector space W (e.g F5,P1)
@@ -27,7 +27,7 @@ and the following methods:
     
 vector
 ------  
-It generates a vector object with three attributes:
+It generates a vector object with two attributes:
     1) vec: array:  sets the array from which the vector is built (e.g [1,2,3])
     2) space: str:  sets the space in which the vector is built (e.g F3)
 and the following methods:
