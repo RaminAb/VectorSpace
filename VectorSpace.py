@@ -35,6 +35,7 @@ and the following methods:
     2) norm : returns the norm of a vector based on defined innerproduct
     3) normalize : normalizes a vector
     4) initial : sets the vector to zero
+    5) project : project a vector to the span of the orthonormal base 'e_basis'
 
     
 Functions on Linear Maps
@@ -183,6 +184,8 @@ class vector:
         return self/self.norm()
     def initial(self):
         return vector(self.vec-self.vec,self.space)
+    def project(self,e_base):
+        return sum([self.innerproduct(b)*b for b in e_base],e_base[0].initial())
 
     
 #========================================================================= 
