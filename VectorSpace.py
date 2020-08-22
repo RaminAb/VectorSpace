@@ -1,6 +1,6 @@
 """
 Credit : Ramin Abbasi
-Update : 08/17/2020
+Update : 08/18/2020
 ========================
 Vector Space (VS) Package
 ========================
@@ -24,6 +24,7 @@ and the following methods:
     1) prod : to multiply two linMaps
     2) null : returns the null of a linMap
     3) eig  : returns the eigenval, eigenvec of linMap
+    4) Adj : returns the adjoint of linMap
     
 vector
 ------  
@@ -36,7 +37,7 @@ and the following methods:
     3) normalize : normalizes a vector
     4) initial : sets the vector to zero
     5) project : project a vector to the span of the orthonormal base 'e_basis'
-
+    
     
 Functions on Linear Maps
 ========================
@@ -51,7 +52,6 @@ InvMatv(mat,base) - returns the vector of 'mat' using 'base'
 Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wBase'
 invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
 getD(space) - returns the dimension of 'space'
-Adj(linMap) - returns the adjoint of 'linMap'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 isindep(bList) - checks the linear independence of 'bList'
 sym2num(Mat) - turns the sympy matrix into numpy array
@@ -148,6 +148,10 @@ class linMap:
         for v in M:
             mat[v[0]] = invMatv(v[2][0],basis(self.V))
         return mat
+    def Adj(self):
+        vBase = basis(self.V)
+        wBase = basis(self.W)
+        return invMat(sym.Matrix.adjoint(Mat(self,vBase,wBase)),wBase,vBase)
 
 class operator(linMap):
     def __init__(self,fun,V):
@@ -177,7 +181,7 @@ class vector:
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
         if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-sym.pi,sym.pi))
+            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-np.pi,np.pi))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
     def normalize(self):
@@ -241,7 +245,9 @@ def invMatv(mat,base):
     else:
         return zerov(base[0].space)
 
-def Mat(lMap,vBase,wBase):
+def Mat(lMap,vBase=0,wBase=0):
+    if vBase == 0 : vBase = basis(lMap.V)
+    if wBase == 0 : wBase = basis(lMap.W)
     return sym.Matrix.hstack(*[Matv(lMap(VBase),wBase) for VBase in vBase])
 
 def invMat(mat,vBase,wBase):
@@ -260,11 +266,6 @@ def getD(space):
         return int(re.search(r'\d',space).group())
     if re.match(r'P.',space):
         return int(re.search(r'\d',space).group())+1
-    
-def Adj(linMap):
-    vBase = basis(linMap.V)
-    wBase = basis(linMap.W)
-    return invMat(sym.Matrix.adjoint(Mat(linMap,vBase,wBase)),wBase,vBase)
 
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
