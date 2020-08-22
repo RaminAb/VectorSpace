@@ -143,10 +143,11 @@ class linMap:
     def null(self):
         return [invMatv(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
     def eig(self):
-        M = Mat(self,basis(self.V),basis(self.W)).eigenvects()
+        M = la.eig(sym2num(Mat(self,basis(self.V),basis(self.W))))
         mat = {}
-        for v in M:
-            mat[v[0]] = invMatv(v[2][0],basis(self.V))
+        for i in range(len(M[0])) : mat[M[0][i]] = []
+        for i in range(len(M[0])):
+            mat[M[0][i]].append(invMatv(M[1][:,i],basis(self.V)))
         return mat
     def Adj(self):
         vBase = basis(self.V)
@@ -250,7 +251,9 @@ def Mat(lMap,vBase=0,wBase=0):
     if wBase == 0 : wBase = basis(lMap.W)
     return sym.Matrix.hstack(*[Matv(lMap(VBase),wBase) for VBase in vBase])
 
-def invMat(mat,vBase,wBase):
+def invMat(mat,vBase=0,wBase=0):
+    if vBase == 0 : vBase = basis("F{}".format(mat.shape[1]))
+    if wBase == 0 : wBase = basis("F{}".format(mat.shape[0]))
     def F(x):
         ''' Unknown '''
         vx = vector(x,vBase[0].space)
@@ -276,7 +279,7 @@ def isindep(bList):
         return 0
     else:
         return 1
-    
+
 def sym2num(Mat):
     return np.array(Mat).astype(np.float64)
 
@@ -388,5 +391,8 @@ def Transform(mat,form = 'D',field = 'C'):
     U = np.concatenate(list(Evec.values()),axis=1)
     Mat = la.inv(U).dot(mat).dot(U)
     return U,_realize(Mat)   
+
+def invTransform(mat,U):
+    return U.dot(mat).dot(la.inv(U))
 
 
