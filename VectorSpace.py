@@ -402,6 +402,11 @@ def SVD(mat):
     f = vectors(U2.transpose(),"F{}".format(mat.shape[0]))
     Uf = sym2num(U(f,basis(f[0].space)))
     Ue = sym2num(U(e,basis(e[0].space)))
-    M = la.inv(Uf).dot(mat).dot(Ue)
+    M  = (Uf.transpose()).dot(mat).dot(Ue)
     return Uf,_realize(M),Ue
 
+def Polar(mat):
+    W,Sigma,V = SVD(mat)
+    P = V.dot(Sigma).dot(V.transpose())
+    U = W.dot(V.transpose())
+    return U,P
