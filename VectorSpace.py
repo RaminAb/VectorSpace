@@ -395,4 +395,13 @@ def Transform(mat,form = 'D',field = 'C'):
 def invTransform(mat,U):
     return U.dot(mat).dot(la.inv(U))
 
+def SVD(mat):
+    U1, M1 = Transform(mat.transpose().dot(mat))
+    U2, M2 = Transform(mat.dot(mat.transpose()))
+    e = vectors(U1.transpose(),"F{}".format(mat.shape[1]))
+    f = vectors(U2.transpose(),"F{}".format(mat.shape[0]))
+    Uf = sym2num(U(f,basis(f[0].space)))
+    Ue = sym2num(U(e,basis(e[0].space)))
+    M = la.inv(Uf).dot(mat).dot(Ue)
+    return Uf,_realize(M),Ue
 
