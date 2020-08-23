@@ -90,8 +90,43 @@ Transform(mat,form,field) - Transforms the matrix into a desired form
     field: specifies the working field (C = Complex, R = Real)
 
     Output: (U,Mat)
+    -------
     U : transformation matrix
     Mat : transformed matrix
+    
+invTransform(mat,U) - Transforms the matrix back using U
+    
+    Input: (mat,U)
+    ------
+    mat : transformed matrix
+    U: transformation matrix
+    
+    Output: Mat
+    -------
+    Mat : transformed matrix
+    
+SVD(mat) - Calculate the Singular-Value-Decomposition 'W*Sigma*V*'
+
+    Input: mat
+    ------
+    mat : input matrix
+    
+    Output: (W,Sigma,V)
+    -------
+    W : left singular vectors
+    Sigma : diagonal matrix of singular values
+    V : right singular vectors
+    
+Polar(mat) - Calcualte the Polar decomposition using svd 'U*P'
+
+    Input: mat
+    ------
+    mat : input matrix
+    
+    Output: (U,P)
+    -------
+    U : Isometry
+    P : Positive Operator
 
 Private methods
 ---------------
