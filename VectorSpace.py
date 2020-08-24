@@ -438,6 +438,11 @@ def SVD(mat):
     Uf = sym2num(U(f,basis(f[0].space)))
     Ue = sym2num(U(e,basis(e[0].space)))
     M  = (Uf.transpose()).dot(mat).dot(Ue)
+    for i in np.where(np.diagonal(M)<0)[0]:
+        e[i] = -1*e[i]
+    Uf = sym2num(U(f,basis(f[0].space)))
+    Ue = sym2num(U(e,basis(e[0].space)))
+    M  = (Uf.transpose()).dot(mat).dot(Ue)
     return Uf,_realize(M),Ue
 
 def Polar(mat):
