@@ -316,8 +316,17 @@ def isindep(bList):
         return 1
 
 def sym2num(Mat):
-    return np.array(Mat).astype(np.float64)
+    return _realize(np.array(Mat).astype(np.float64))
 
+def findBase(T,mat):
+    M = sym2num(Mat(T))
+    L = la.block_diag(*[M]*M.shape[0]) - _expand(mat.transpose())
+    V = np.sum(la.null_space(L),axis=1)
+    if V!=[]:
+        return vectors(np.hsplit(V,getD(T.V)),T.V)
+    else:
+        print("couldn't find a basis")
+        return []
 
 #========================================================================= 
 # Matrix Functions
@@ -348,7 +357,6 @@ def eig(mat,mode = 'D'):
 def _setR(gen_eigvec,gen_eigval):
     num = 1
     for ev in gen_eigvec.keys():
-        print(ev.imag)
         if not(abs(ev.imag-0)<eps):
             if num == 1:
                 gen_eigvec[ev] = 2*gen_eigvec[ev].real
@@ -414,6 +422,10 @@ def _realize(mat):
     else:
         mat.imag[np.absolute(np.imag(mat))< eps]=0
     return mat
+
+def _expand(mat):
+    n = mat.shape[0]
+    return np.vstack([np.block([np.eye(n)]*n)*np.repeat(mat[i,:],n) for i in range(n)])
 
 def Transform(mat,form = 'D',field = 'C'):
     if field == 'R':
