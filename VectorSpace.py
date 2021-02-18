@@ -55,6 +55,7 @@ getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 isindep(bList) - checks the linear independence of 'bList'
 sym2num(Mat) - turns the sympy matrix into numpy array
+findBasis(T,mat) - turns the basis on which T has the form mat
 
 Functions on Matrices
 =====================
@@ -134,6 +135,7 @@ _setR(gen_eigvec,gen_eigval) - restricts the basis computation to Field R
 _GenEigen(Base,nil,num,mode) - returns the correct basis for D or J form
 _makebasis(arr,n) - rearranges the basis to have a uniform structure
 _realize(mat) - turns a complex matrix 'mat' into real if possible
+_expand(mat) - expand each entry of the matrix by multiplying it by I
 """
 
 
@@ -265,16 +267,16 @@ def Gramm(base):
     return eBase
 
 def Matv(vec,base):
-    n = len(base)
-    eBase = Gramm(basis(vec.space))
-    X = sym.symbols('x0:%d'%n)
-    Eq = sym.zeros(1,n)
-    for k in range(n):
-        Eq[k] = sum([X[i]*(base[i].innerproduct(eBase[k])) for i in range(n)]) - vec.innerproduct(eBase[k])
+    Mvec = np.zeros((1,1))
+    if re.match(r'P.',base[0].space):
+        for b in base[1:]:
+            Mvec = np.append(Mvec,vec.vec.coeff(b.vec))
+        Mvec[0] = (vec - Mvec.dot(base)).vec
+        return sym.Matrix(Mvec)
+    if re.match(r'F.',base[0].space):
+        B = sym.Matrix([b.vec for b in base]).transpose()
+        return sym.Matrix(B.inv()*(vec.vec[:,np.newaxis]))
     
-    sol = sym.solve(Eq,X)
-    return sym.Matrix([sol[X[i]] for i in range(n)])
-
 def invMatv(mat,base):
     if mat != []:
         return vector(sum([mat[i]*base[i].vec for i in range(len(base))]),base[0].space)
