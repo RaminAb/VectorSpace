@@ -1,6 +1,6 @@
 """
 Credit : Ramin Abbasi
-Update : 08/18/2020
+Update : 02/18/2021
 ========================
 Vector Space (VS) Package
 ========================
@@ -45,7 +45,7 @@ Functions on Linear Maps
 vectors(array,space) - generate a list of vectors from 'array' in 'space'
 zerov(space) - generates a zero vector in 'space'
 eye(space) - generate identity map on 'space'
-basis(space) - generate standard basis on 'space'
+basis(space) - generate orthonormal standard basis on 'space'
 Gramm(base) - generate an orthonormal basis from 'base' using Gram-Shmidt
 Matv(vec,base) - returns the matrix of 'vec' using 'base'
 InvMatv(mat,base) - returns the vector of 'mat' using 'base'
@@ -106,7 +106,7 @@ invTransform(mat,U) - Transforms the matrix back using U
     -------
     Mat : transformed matrix
     
-SVD(mat) - Calculate the Singular-Value-Decomposition 'W*Sigma*V*'
+SVD(mat, vBase, wBase) - Calculate the Singular-Value-Decomposition 'W*Sigma*V^-1'
 
     Input: mat
     ------
@@ -253,10 +253,10 @@ def basis(space):
     n = getD(space)
     if re.match(r'F.',space):
         base = sym.Matrix.diag([1]*n)
-        return vectors([base.row(i)[:] for i in range(n)],space)
+        return Gramm(vectors([base.row(i)[:] for i in range(n)],space))
     if re.match(r'P.',space):
         x = sym.Symbol('x')
-        return vectors([x**i for i in range(n)],space)
+        return Gramm(vectors([x**i for i in range(n)],space))
 
 def Gramm(base):
     eBase = base.copy()
@@ -296,10 +296,8 @@ def invMat(mat,vBase=0,wBase=0):
         vx = vector(x,vBase[0].space)
         x_vec = Matv(vx,vBase)
         return (invMatv(mat*x_vec,wBase)).vec
-    if vBase[0].space == wBase[0].space:
-        return operator(F,vBase[0].space)
-    else:
-        return linMap(F,vBase[0].space,wBase[0].space)
+    return linMap(F,vBase[0].space,wBase[0].space)
+        
     
 def getD(space):
     if re.match(r'F.',space):
@@ -333,12 +331,13 @@ def findBase(T,mat):
 #========================================================================= 
 # Matrix Functions
 #========================================================================= 
-eps = 1e-10
+eps = 1e-6
 
 def eig(mat,mode = 'D'):
     Eigen = la.eig(mat)
 #    eigval = np.sort(np.unique(Eigen[0]))[::-1]
     eigval = np.sort(np.unique(np.around(Eigen[0],decimals = 15)))[::-1]
+    eigval = _realize(eigval) #Test
     gen_eigvec = {}
     gen_eigval = {}
     for ev in eigval:
@@ -444,23 +443,29 @@ def Transform(mat,form = 'D',field = 'C'):
 def invTransform(mat,U):
     return U.dot(mat).dot(la.inv(U))
 
-def SVD(mat):
-    U1, M1 = Transform(mat.transpose().dot(mat))
-    U2, M2 = Transform(mat.dot(mat.transpose()))
-    e = vectors(U1.transpose(),"F{}".format(mat.shape[1]))
-    f = vectors(U2.transpose(),"F{}".format(mat.shape[0]))
-    Uf = sym2num(U(f,basis(f[0].space)))
-    Ue = sym2num(U(e,basis(e[0].space)))
-    M  = (Uf.transpose()).dot(mat).dot(Ue)
-    for i in np.where(np.diagonal(M)<0)[0]:
-        e[i] = -1*e[i]
-    Uf = sym2num(U(f,basis(f[0].space)))
-    Ue = sym2num(U(e,basis(e[0].space)))
-    M  = (Uf.transpose()).dot(mat).dot(Ue)
-    return Uf,_realize(M),Ue
+def SVD(mat, vBase = 0, wBase = 0):
+    if vBase == 0 : vBase = basis("F{}".format(mat.shape[1]))
+    if wBase == 0 : wBase = basis("F{}".format(mat.shape[0]))
+    U_vBase = sym2num(U(vBase,basis("F{}".format(mat.shape[1]))))
+    U_wBase = sym2num(U(wBase,basis("F{}".format(mat.shape[0])))) 
+    M = U_wBase.dot(mat).dot(np.linalg.inv(U_vBase))
+    MtM = M.transpose().conjugate().dot(M)
+    MMt = M.dot(M.transpose().conjugate())
+    E = eig(MtM)[0]
+    F = eig(MMt)[0]
+    e = []
+    f = []
+    for sv in list(E.keys()):
+        e.append(E[sv])
+        f.append(F[sv])
+    Ue = np.concatenate(e,axis=1)
+    Uf = np.concatenate(f,axis=1)
+    return np.linalg.inv(U_wBase).dot(Uf),\
+           Uf.transpose().dot(M).dot(Ue),\
+           np.linalg.inv(U_vBase).dot(Ue)
 
-def Polar(mat):
-    W,Sigma,V = SVD(mat)
-    P = V.dot(Sigma).dot(V.transpose())
-    U = W.dot(V.transpose())
+def Polar(mat, vBase = 0, wBase = 0):
+    W,Sigma,V = SVD(mat,vBase,wBase)
+    P = V.dot(Sigma).dot(np.linalg.inv(V))
+    U = W.dot(np.linalg.inv(V))
     return U,P
