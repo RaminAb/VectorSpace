@@ -112,19 +112,27 @@ class linMap:
         M = Mat(self,vBase,wBase)
         eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
         eigen_vec = []
-        eig = []
+        eig_mlt = []
         for ev,algmlt in zip(eigen_val,alg_mlt):
             nill = M - ev*np.eye(n)
             geo_mlt = la.null_space(nill).shape[1]
             eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt)))
-            eig.append((ev,algmlt,geo_mlt))
+            eig_mlt.append((ev,algmlt,geo_mlt))
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
-        return eig,eigen
+        return eig_mlt,eigen
+    def diag(self):
+        eig_mlt, eigen = self.eig()
+        return Mat(self,eigen,eigen)
     def Adj(self):
         vBase = Gramm(basis(self.V))
         wBase = Gramm(basis(self.W))
         return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
+    def svd(self):
+        sv = [np.sqrt(ev[0]) for ev in (self.Adj().prod(self)).eig()[0]]
+        e = (self.Adj().prod(self)).eig()[1]
+        f = (self.prod(self.Adj())).eig()[1]
+        return sv,e,f
 
 class vector:
     def __init__(self,array,space):
