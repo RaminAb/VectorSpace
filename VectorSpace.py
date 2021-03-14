@@ -63,6 +63,7 @@ import numpy as np
 import scipy.linalg as la
 import re
 sym.init_printing(pretty_print=False)
+np.printoptions(precision=2)
 
 #========================================================================= 
 # Classes
@@ -74,7 +75,8 @@ class linMap:
         self.V = V
         self.W = W
     def __call__(self,v):
-        return vector(self.fun(v.vec),self.W)
+        if re.match(r'P.',self.V): return vector(self.fun(v.vec).evalf(6),self.W)
+        if re.match(r'F.',self.V): return vector(self.fun(v.vec),self.W)
     def __mul__(self,scalar):
         return linMap(lambda x: scalar*self.fun(x),self.V,self.W)
     __rmul__=__mul__
@@ -98,16 +100,30 @@ class linMap:
     def prod(self,other):
         return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
     def null(self):
-        N = la.null_space(Mat(self,basis(self.V),basis(self.W))).transpose()
+        vBase = Gramm(basis(self.V))
+        wBase = Gramm(basis(self.W))
+        N = la.null_space(Mat(self,vBase,wBase)).transpose()
         if N.size == 0 : return zerov(self.V)
-        return [invMatv(M,basis(self.V)) for M in N]
+        return [invMatv(M,vBase).vec.evalf(2) for M in N]
     def eig(self):
-        M = la.eig(Mat(self,basis(self.V),basis(self.W)))
-        print(M)
-        return 0
+        vBase = Gramm(basis(self.V))
+        wBase = Gramm(basis(self.W))
+        n = getD(self.V)
+        M = Mat(self,vBase,wBase)
+        eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
+        eigen_vec = []
+        eig = []
+        for ev,algmlt in zip(eigen_val,alg_mlt):
+            nill = M - ev*np.eye(n)
+            geo_mlt = la.null_space(nill).shape[1]
+            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt)))
+            eig.append((ev,algmlt,geo_mlt))
+        eigen_vec = np.concatenate(eigen_vec,axis=1)
+        eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
+        return eig,eigen
     def Adj(self):
-        vBase = basis(self.V)
-        wBase = basis(self.W)
+        vBase = Gramm(basis(self.V))
+        wBase = Gramm(basis(self.W))
         return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
 
 class vector:
@@ -226,5 +242,8 @@ def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
 
 def sym2num(Mat):
-    return np.array(Mat).astype(np.float64)
+    return np.array(Mat).astype('float')
 
+def realize(Mat,tol):
+    Mat.real[abs(Mat.real) < tol] = 0
+    return Mat
