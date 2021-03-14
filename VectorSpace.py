@@ -45,7 +45,7 @@ Functions on Linear Maps
 vectors(array,space) - generate a list of vectors from 'array' in 'space'
 zerov(space) - generates a zero vector in 'space'
 eye(space) - generate identity map on 'space'
-basis(space) - generate orthonormal standard basis on 'space'
+basis(space) - generate orthonormal standard basis on 'space' 
 Gramm(base) - generate an orthonormal basis from 'base' using Gram-Shmidt
 Matv(vec,base) - returns the matrix of 'vec' using 'base'
 InvMatv(mat,base) - returns the vector of 'mat' using 'base'
@@ -53,7 +53,6 @@ Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wB
 invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
-isindep(bList) - checks the linear independence of 'bList'
 sym2num(Mat) - turns the sympy matrix into numpy array
 """
 
@@ -61,7 +60,7 @@ sym2num(Mat) - turns the sympy matrix into numpy array
 
 import sympy as sym
 import numpy as np
-#import scipy.linalg as la
+import scipy.linalg as la
 import re
 sym.init_printing(pretty_print=False)
 
@@ -91,21 +90,25 @@ class linMap:
             z = sym.symbols('z0:%d'%n)
             return '{}({}->{}) : {} -> {}'.format(type(self).__name__,self.V,self.W,z, self.fun(z))
         if re.match(r'P.',self.V):
-            return '{}({}->{}) : {}'.format(type(self).__name__,self.V,self.W,self.fun.__doc__)
+            n = getD(self.V)
+            p = invMatv(np.ones(n),basis(self.V))
+            return '{}({}->{}) : {} -> {}'.format(type(self).__name__,self.V,self.W,p,self(p))
     def __repr__(self):
         return str(self)
     def prod(self,other):
         return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
     def null(self):
-        return [invMatv(M,basis(self.V)) for M in Mat(self,basis(self.V),basis(self.W)).nullspace()]
+        N = la.null_space(Mat(self,basis(self.V),basis(self.W))).transpose()
+        if N.size == 0 : return zerov(self.V)
+        return [invMatv(M,basis(self.V)) for M in N]
     def eig(self):
-        M = Mat(self,basis(self.V),basis(self.W)).eigenvals()
+        M = la.eig(Mat(self,basis(self.V),basis(self.W)))
         print(M)
         return 0
     def Adj(self):
         vBase = basis(self.V)
         wBase = basis(self.W)
-        return invMat(sym.Matrix.adjoint(Mat(self,vBase,wBase)),wBase,vBase)
+        return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
 
 class vector:
     def __init__(self,array,space):
@@ -161,18 +164,16 @@ def eye(space):
     I = invMat(sym.eye(n),basis(space),basis(space))
     return I
 
-def basis(space, gramm = 1):
+def basis(space):
     n = getD(space)
     if re.match(r'F.',space):
         base = sym.Matrix.diag([1]*n)
         B = vectors([base.row(i)[:] for i in range(n)],space)
-        if gramm == 1: return Gramm(B)
-        if gramm == 0: return B
+        return B
     if re.match(r'P.',space):
         x = sym.Symbol('x')
         B = vectors([x**i for i in range(n)],space)
-        if gramm == 1: return Gramm(B)
-        if gramm == 0: return B
+        return B
 
 def Gramm(base):
     eBase = base.copy()
@@ -182,7 +183,7 @@ def Gramm(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
-def Matv(v,base):
+def Matv(v,base, symnum = 1):
     if re.match(r'P.',base[0].space):
         x = sym.Symbol('x')
         base_sum = sum([b.vec for b in base])
@@ -191,33 +192,30 @@ def Matv(v,base):
         coef_pad = np.zeros(scale.shape)
         coef_pad[scale.shape[0]-coef.shape[0]:] = coef
         mat = coef_pad/scale
-        return sym2num(mat[scale !=0][::-1])[:,np.newaxis]
+        if symnum == 0 : return (mat[scale !=0][::-1])[:,np.newaxis]
+        if symnum == 1 : return sym2num(mat[scale !=0][::-1])[:,np.newaxis]
     if re.match(r'F.',base[0].space):
         B = sym.Matrix([(b.vec).T for b in base]).T
-        return sym2num(B.inv()*(v.vec)[:,np.newaxis])
-    
-def invMatv(mat,base):
-    if mat != []:
-        return vector(sum([mat[i]*base[i].vec for i in range(len(base))]),base[0].space)
-    else:
-        return zerov(base[0].space)
+        if symnum == 0 : return B.inv()*(v.vec)[:,np.newaxis]
+        if symnum == 1 : return sym2num(B.inv()*(v.vec)[:,np.newaxis])
 
-def Mat(lMap,vBase=0,wBase=0):
-    if vBase == 0 : vBase = basis(lMap.V)
-    if wBase == 0 : wBase = basis(lMap.W)
+def invMatv(mat,base):
+    vec = sum([mat[i]*base[i].vec for i in range(len(base))])
+    if re.match(r'F.',base[0].space): return vector(vec,base[0].space)
+    if re.match(r'P.',base[0].space): return vector(sym.Matrix([vec])[0],base[0].space)
+
+def Mat(lMap,vBase,wBase):
     return np.concatenate([Matv(lMap(VBase),wBase) for VBase in vBase],axis=1)
 
-def invMat(mat,vBase=0,wBase=0):
-    if vBase == 0 : vBase = basis("F{}".format(mat.shape[1]))
-    if wBase == 0 : wBase = basis("F{}".format(mat.shape[0]))
+def invMat(mat,vBase,wBase):
     def F(x):
-        ''' Unknown '''
         vx = vector(x,vBase[0].space)
-        x_vec = Matv(vx,vBase)
+        x_vec = Matv(vx,vBase,symnum=0)
+        if isinstance(mat,(np.ndarray)) and isinstance(x_vec,(np.ndarray)):
+            x_vec = sym.Matrix(x_vec)
         return (invMatv(mat*x_vec,wBase)).vec
     return linMap(F,vBase[0].space,wBase[0].space)
         
-    
 def getD(space):
     if re.match(r'F.',space):
         return int(re.search(r'\d',space).group())
@@ -226,13 +224,6 @@ def getD(space):
 
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
-
-def isindep(bList):
-    M = sym.Matrix.hstack(*list(map(lambda x : sym.Matrix(x.vec),bList)))
-    if  M.det() == 0:
-        return 0
-    else:
-        return 1
 
 def sym2num(Mat):
     return np.array(Mat).astype(np.float64)
