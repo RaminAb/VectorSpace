@@ -135,9 +135,11 @@ class linMap:
         wBase = Gram(basis(self.W))
         return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
     def svd(self):
-        sv = [np.sqrt(ev[0]) for ev in (self.Adj().prod(self)).eig()[0]]
-        e = (self.Adj().prod(self)).eig()[1]
-        f = (self.prod(self.Adj())).eig()[1]
+        sv_right = (self.Adj().prod(self)).eig() 
+        sv_left = (self.prod(self.Adj())).eig()
+        sv = [np.sqrt(ev[0]) for ev in sv_right[0]]
+        e = sv_right[1]
+        f = sv_left[1]
         return sv,e,f
 
 class vector:
@@ -215,18 +217,20 @@ def Gram(base):
 
 def Matv(v,base, symnum = 1):
     if re.match(r'P.',base[0].space):
+        n = getD(base[0].space)
+        c = sym.symbols('c0:{}'.format(n))
         x = sym.Symbol('x')
-        base_sum = sum([b.vec for b in base])
-        scale = np.array(sym.Poly(base_sum,x).all_coeffs(),dtype = 'float')
-        coef = np.array(sym.Poly(v.vec,x).all_coeffs(),dtype = 'float')
-        diff = abs(scale.shape[0]-coef.shape[0])
-        if scale.size < coef.size:
-            scale = np.pad(scale,(diff,0),'constant',constant_values=1) 
-        if coef.size < scale.size:
-            coef = np.pad(coef,(diff,0),'constant',constant_values=0)
-        mat = coef/scale
-        if symnum == 0 : return (mat[scale !=0][::-1])[:,np.newaxis]
-        if symnum == 1 : return sym2num(mat[scale !=0][::-1])[:,np.newaxis]
+        C = np.array(c)[:,np.newaxis]
+        B = np.array(base)
+
+        Base_Poly = sym.Poly(invMatv(C,base),x)
+        Vec_Poly  = sym.Poly(v.vec,x)
+        Eq = (Base_Poly-Vec_Poly).all_coeffs()
+        Coef = sym.linsolve(Eq,c)
+        res = np.array(Coef.args[0])[:,np.newaxis]
+        if symnum == 0 : return res
+        else : return res.astype('float')
+        
     if re.match(r'F.',base[0].space):
         B = sym.Matrix([(b.vec).T for b in base]).T
         if symnum == 0 : return B.inv()*(v.vec)[:,np.newaxis]
