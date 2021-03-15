@@ -46,7 +46,7 @@ vectors(array,space) - generate a list of vectors from 'array' in 'space'
 zerov(space) - generates a zero vector in 'space'
 eye(space) - generate identity map on 'space'
 basis(space) - generate orthonormal standard basis on 'space' 
-Gramm(base) - generate an orthonormal basis from 'base' using Gram-Shmidt
+Gram(base) - generate an orthonormal basis from 'base' using Gram-Shmidt
 Matv(vec,base) - returns the matrix of 'vec' using 'base'
 InvMatv(mat,base) - returns the vector of 'mat' using 'base'
 Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wBase'
@@ -90,24 +90,30 @@ class linMap:
         if re.match(r'F.',self.V):
             n = getD(self.V)
             z = sym.symbols('z0:%d'%n)
-            return '{}({}->{}) : {} -> {}'.format(type(self).__name__,self.V,self.W,z, self.fun(z))
+            return '{}({}->{}) : {} -> {} {}'.format(type(self).__name__,self.V,
+                    self.W,z, self.fun(z),self.fun.__doc__)
         if re.match(r'P.',self.V):
             n = getD(self.V)
             p = invMatv(np.ones(n),basis(self.V))
-            return '{}({}->{}) : {} -> {}'.format(type(self).__name__,self.V,self.W,p,self(p))
+            return '{}({}->{}) : {} -> {} {}'.format(type(self).__name__,self.V,
+                    self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
+    def doc(self,document):
+        self.fun.__doc__ = document
     def prod(self,other):
-        return linMap(lambda x: self.fun(other.fun(x)),self.V,other.W)
+        Map = linMap(lambda x: self.fun(other.fun(x)),other.V,self.W)
+        Map.fun.__doc__ = ""
+        return Map
     def null(self):
-        vBase = Gramm(basis(self.V))
-        wBase = Gramm(basis(self.W))
+        vBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.W))
         N = la.null_space(Mat(self,vBase,wBase)).transpose()
-        if N.size == 0 : return zerov(self.V)
-        return [invMatv(M,vBase).vec.evalf(2) for M in N]
+        if N.size == 0 : return [zerov(self.V)]
+        return [invMatv(M,vBase) for M in N]
     def eig(self):
-        vBase = Gramm(basis(self.V))
-        wBase = Gramm(basis(self.W))
+        vBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.V))
         n = getD(self.V)
         M = Mat(self,vBase,wBase)
         eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
@@ -120,13 +126,13 @@ class linMap:
             eig_mlt.append((ev,algmlt,geo_mlt))
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
-        return eig_mlt,eigen
+        return eig_mlt,sym2num(eigen)
     def diag(self):
         eig_mlt, eigen = self.eig()
         return Mat(self,eigen,eigen)
     def Adj(self):
-        vBase = Gramm(basis(self.V))
-        wBase = Gramm(basis(self.W))
+        vBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.W))
         return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
     def svd(self):
         sv = [np.sqrt(ev[0]) for ev in (self.Adj().prod(self)).eig()[0]]
@@ -158,7 +164,7 @@ class vector:
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
         if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-sym.pi,sym.pi))
+            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-1,1))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
     def normalize(self):
@@ -185,7 +191,7 @@ def zerov(space):
 
 def eye(space):
     n = getD(space)
-    I = invMat(sym.eye(n),basis(space),basis(space))
+    I = invMat(sym.eye(n),basis(space),basis(space),doc = """Identity""")
     return I
 
 def basis(space):
@@ -199,7 +205,7 @@ def basis(space):
         B = vectors([x**i for i in range(n)],space)
         return B
 
-def Gramm(base):
+def Gram(base):
     eBase = base.copy()
     eBase[0] = base[0].normalize()
     for i in range(1,len(base)):
@@ -211,11 +217,14 @@ def Matv(v,base, symnum = 1):
     if re.match(r'P.',base[0].space):
         x = sym.Symbol('x')
         base_sum = sum([b.vec for b in base])
-        scale = np.array(sym.Poly(base_sum,x).all_coeffs())
-        coef = np.array(sym.Poly(v.vec,x).all_coeffs())
-        coef_pad = np.zeros(scale.shape)
-        coef_pad[scale.shape[0]-coef.shape[0]:] = coef
-        mat = coef_pad/scale
+        scale = np.array(sym.Poly(base_sum,x).all_coeffs(),dtype = 'float')
+        coef = np.array(sym.Poly(v.vec,x).all_coeffs(),dtype = 'float')
+        diff = abs(scale.shape[0]-coef.shape[0])
+        if scale.size < coef.size:
+            scale = np.pad(scale,(diff,0),'constant',constant_values=1) 
+        if coef.size < scale.size:
+            coef = np.pad(coef,(diff,0),'constant',constant_values=0)
+        mat = coef/scale
         if symnum == 0 : return (mat[scale !=0][::-1])[:,np.newaxis]
         if symnum == 1 : return sym2num(mat[scale !=0][::-1])[:,np.newaxis]
     if re.match(r'F.',base[0].space):
@@ -231,8 +240,9 @@ def invMatv(mat,base):
 def Mat(lMap,vBase,wBase):
     return np.concatenate([Matv(lMap(VBase),wBase) for VBase in vBase],axis=1)
 
-def invMat(mat,vBase,wBase):
+def invMat(mat,vBase,wBase, doc = ""):
     def F(x):
+        F.__doc__ = doc
         vx = vector(x,vBase[0].space)
         x_vec = Matv(vx,vBase,symnum=0)
         if isinstance(mat,(np.ndarray)) and isinstance(x_vec,(np.ndarray)):
@@ -250,6 +260,13 @@ def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
 
 def sym2num(Mat):
+    if isinstance(Mat,(list)):
+        return [sym2num(v) for v in Mat]
+    if isinstance(Mat,(vector)):
+        if isinstance (Mat.vec,(np.ndarray)):
+            return vector((Mat.vec).astype('float'),Mat.space)
+        if isinstance (Mat.vec,(sym.Basic)):
+            return vector((Mat.vec).evalf(),Mat.space)
     return np.array(Mat).astype('float')
 
 def realize(Mat,tol):
