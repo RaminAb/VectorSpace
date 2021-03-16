@@ -177,7 +177,7 @@ class vector:
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
         if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-np.pi,np.pi))
+            return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-1,1))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
     def normalize(self):
@@ -204,7 +204,7 @@ def zerov(space):
 
 def eye(space):
     n = getD(space)
-    I = invMat(sym.eye(n),basis(space),basis(space),doc = """Identity""")
+    I = invMat(sym.eye(n),basis(space),basis(space),doc = "Identity")
     return I
 
 def basis(space):
