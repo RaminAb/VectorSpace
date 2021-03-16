@@ -1,6 +1,6 @@
 """
 Credit : Ramin Abbasi
-Update : 02/18/2021
+Update : 03/16/2021
 ========================
 Vector Space (VS) Package
 ========================
@@ -21,10 +21,16 @@ It generates a linear map object (V -> W) with three attributes:
     2) V: str: sets the vector space V (e.g F3,P2)
     3) W: str: sets the vector space W (e.g F5,P1)
 and the following methods:
-    1) prod : to multiply two linMaps
-    2) null : returns the null of a linMap
-    3) eig  : returns the eigenval, eigenvec of linMap
-    4) Adj : returns the adjoint of linMap
+    1) doc  : sets the linMap documentation
+    2) prod : multiplies two linMaps
+    3) null : nullspace of a linMap
+    4) eig  : eigen_val and eigen_vec of linMap
+    5) trace: trace of the operator
+    6) det  : determinant of the operator
+    7) char : characteristic polynomial of the operator
+    8) diag : triangular or diagonal form of the operator
+    9) Adj  : adjoint of linMap
+    10) svd : singular value decomposition
     
 vector
 ------  
@@ -37,8 +43,7 @@ and the following methods:
     3) normalize : normalizes a vector
     4) initial : sets the vector to zero
     5) project : project a vector to the span of the orthonormal base 'e_basis'
-    
-    
+
 Functions on Linear Maps
 ========================
 
@@ -54,16 +59,14 @@ invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','w
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 sym2num(Mat) - turns the sympy matrix into numpy array
+realize(Mat) - sets small floats to zero
 """
-
-
 
 import sympy as sym
 import numpy as np
 import scipy.linalg as la
 import re
 sym.init_printing(pretty_print=False)
-np.printoptions(precision=2)
 
 #========================================================================= 
 # Classes
@@ -75,8 +78,8 @@ class linMap:
         self.V = V
         self.W = W
     def __call__(self,v):
-        if re.match(r'P.',self.V): return vector(self.fun(v.vec).evalf(6),self.W)
-        if re.match(r'F.',self.V): return vector(self.fun(v.vec),self.W)
+        if re.match(r'P.',self.V): return sym2num(vector(self.fun(v.vec).evalf(6),self.W))
+        if re.match(r'F.',self.V): return sym2num(vector(self.fun(v.vec),self.W))
     def __mul__(self,scalar):
         return linMap(lambda x: scalar*self.fun(x),self.V,self.W)
     __rmul__=__mul__
@@ -127,6 +130,14 @@ class linMap:
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
         return eig_mlt,sym2num(eigen)
+    def trace(self):
+        return sum([ev[1]*ev[0] for ev in self.eig()[0]])
+    def det(self):
+        return np.prod(np.array([ev[0]**ev[1] for ev in self.eig()[0]]))
+    def char(self):
+        z = sym.symbols('z')
+        poly = [(z-ev[0])**ev[1] for ev in self.eig()[0]]
+        return sym.expand(np.prod(np.array(poly)))
     def diag(self):
         eig_mlt, eigen = self.eig()
         return Mat(self,eigen,eigen)
@@ -166,7 +177,7 @@ class vector:
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
         if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.Symbol('x'),-1,1))
+            return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-np.pi,np.pi))
     def norm(self):
         return sym.sqrt(self.innerproduct(self))
     def normalize(self):
@@ -203,7 +214,7 @@ def basis(space):
         B = vectors([base.row(i)[:] for i in range(n)],space)
         return B
     if re.match(r'P.',space):
-        x = sym.Symbol('x')
+        x = sym.symbols('x')
         B = vectors([x**i for i in range(n)],space)
         return B
 
@@ -219,17 +230,16 @@ def Matv(v,base, symnum = 1):
     if re.match(r'P.',base[0].space):
         n = getD(base[0].space)
         c = sym.symbols('c0:{}'.format(n))
-        x = sym.Symbol('x')
+        x = sym.symbols('x')
         C = np.array(c)[:,np.newaxis]
         B = np.array(base)
 
-        Base_Poly = sym.Poly(invMatv(C,base),x)
+        Base_Poly = sym.Poly(str(invMatv(C,base)),x)
         Vec_Poly  = sym.Poly(v.vec,x)
         Eq = (Base_Poly-Vec_Poly).all_coeffs()
         Coef = sym.linsolve(Eq,c)
         res = np.array(Coef.args[0])[:,np.newaxis]
-        if symnum == 0 : return res
-        else : return res.astype('float')
+        return res if symnum==0 else res.astype('float')
         
     if re.match(r'F.',base[0].space):
         B = sym.Matrix([(b.vec).T for b in base]).T
