@@ -93,13 +93,11 @@ class linMap:
         if re.match(r'F.',self.V):
             n = getD(self.V)
             z = sym.symbols('z0:%d'%n)
-            return '{}({}->{}) : {} -> {} {}'.format(type(self).__name__,self.V,
-                    self.W,z, self.fun(z),self.fun.__doc__)
+            return 'L({},{}): {} ==> {} {}'.format(self.V,self.W,z, self.fun(z),self.fun.__doc__)
         if re.match(r'P.',self.V):
             n = getD(self.V)
             p = invMatv(np.ones(n),basis(self.V))
-            return '{}({}->{}) : {} -> {} {}'.format(type(self).__name__,self.V,
-                    self.W,p,self(p),self.fun.__doc__)
+            return 'L({},{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
     def doc(self,document):
@@ -124,8 +122,8 @@ class linMap:
         eig_mlt = []
         for ev,algmlt in zip(eigen_val,alg_mlt):
             nill = M - ev*np.eye(n)
-            geo_mlt = la.null_space(nill).shape[1]
-            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt)))
+            geo_mlt = la.null_space(nill,rcond=1e-10).shape[1]
+            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt),rcond=1e-10))
             eig_mlt.append((ev,algmlt,geo_mlt))
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
@@ -283,6 +281,14 @@ def sym2num(Mat):
             return vector((Mat.vec).evalf(),Mat.space)
     return np.array(Mat).astype('float')
 
-def realize(Mat,tol):
-    Mat.real[abs(Mat.real) < tol] = 0
-    return Mat
+def realize(Mat,tol = 1e-10):
+    if isinstance (Mat,(list)):
+        return [realize(v) for v in Mat]
+    if isinstance (Mat,(vector)):
+        return realize(Mat.vec)
+    M = Mat.astype(np.complex)
+    M.real[abs(Mat.real) < tol] = 0.0
+    M.imag[abs(Mat.imag) < tol] = 0.0
+    if (abs(Mat.imag) < tol).all():
+        return np.real(M)
+    return M
