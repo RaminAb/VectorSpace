@@ -66,7 +66,6 @@ import sympy as sym
 import numpy as np
 import scipy.linalg as la
 import re
-sym.init_printing(pretty_print=False)
 
 #========================================================================= 
 # Classes

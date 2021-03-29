@@ -3,7 +3,6 @@ Checks VectorSpace functionality by touching almost all defined functions
 """
 import VectorSpace as vs
 import sympy as sym
-import numpy as np
 
 x = sym.Symbol('x')
 
@@ -18,7 +17,7 @@ p = vs.vector(1+2*x+3*x**2,'P2')
 
 def f(X):
     """A Linear Map!"""
-    return np.array([X[0]+2*X[1]+X[2],2*X[1],3*X[2]])
+    return [X[0]+2*X[1]+X[2],2*X[1],3*X[2]]
 def g(p):
     """ Differential Map!"""
     return sym.diff(p,x)
