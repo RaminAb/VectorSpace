@@ -93,11 +93,11 @@ class linMap:
         if re.match(r'F.',self.V):
             n = getD(self.V)
             z = sym.symbols('z0:%d'%n)
-            return 'L({},{}): {} ==> {} {}'.format(self.V,self.W,z, self.fun(z),self.fun.__doc__)
+            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,z, self.fun(z),self.fun.__doc__)
         if re.match(r'P.',self.V):
             n = getD(self.V)
             p = invMatv(np.ones(n),basis(self.V))
-            return 'L({},{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
+            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
     def doc(self,document):
