@@ -56,12 +56,13 @@ Matv(vec,base) - returns the matrix of 'vec' using 'base'
 InvMatv(mat,base) - returns the vector of 'mat' using 'base'
 Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wBase'
 invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
+isindep(l) - Checks if a list of vectors is linearly independent
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 sym2num(Mat) - turns the sympy matrix into numpy array
 realize(Mat) - sets small floats to zero
 """
-
+import warnings 
 import sympy as sym
 import numpy as np
 import scipy.linalg as la
@@ -223,9 +224,9 @@ def Gram(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
-def Matv(v,base, symnum = 1):
+def Matv(v,base, symnum = True, indep_prompt = True):
     if re.match(r'P.',base[0].space):
-        n = getD(base[0].space)
+        n = len(base)
         c = sym.symbols('c0:{}'.format(n))
         x = sym.symbols('x')
         C = np.array(c)[:,np.newaxis]
@@ -233,15 +234,25 @@ def Matv(v,base, symnum = 1):
 
         Base_Poly = sym.Poly(str(invMatv(C,base)),x)
         Vec_Poly  = sym.Poly(v.vec,x)
+
         Eq = (Base_Poly-Vec_Poly).all_coeffs()
         Coef = sym.linsolve(Eq,c)
+        if len(Coef) < 1 or len(Coef.free_symbols) > 0:
+            if indep_prompt: 
+                print('Warning: Improper base! Returning 0')
+            return 0
         res = np.array(Coef.args[0])[:,np.newaxis]
-        return res if symnum==0 else res.astype('float')
-        
+        return res.astype('float') if symnum else res
+
     if re.match(r'F.',base[0].space):
         B = sym.Matrix([(b.vec).T for b in base]).T
-        if symnum == 0 : return B.inv()*(v.vec)[:,np.newaxis]
-        if symnum == 1 : return sym2num(B.inv()*(v.vec)[:,np.newaxis])
+        res = B.pinv()*(v.vec)[:,np.newaxis]
+        chk = B*B.pinv()*v.vec[:,np.newaxis]-v.vec[:,np.newaxis]
+        if B.rank() < B.shape[1] or chk.norm() > 1e-6:
+            if indep_prompt:
+                print('Warning: Improper base! Returning 0')
+            return 0
+        return sym2num(res) if symnum else res
 
 def invMatv(mat,base):
     vec = sum([mat[i]*base[i].vec for i in range(len(base))])
@@ -255,12 +266,20 @@ def invMat(mat,vBase,wBase, doc = ""):
     def F(x):
         F.__doc__ = doc
         vx = vector(x,vBase[0].space)
-        x_vec = Matv(vx,vBase,symnum=0)
+        x_vec = Matv(vx,vBase,symnum=False)
         if isinstance(mat,(np.ndarray)) and isinstance(x_vec,(np.ndarray)):
             x_vec = sym.Matrix(x_vec)
         return (invMatv(mat*x_vec,wBase)).vec
     return linMap(F,vBase[0].space,wBase[0].space)
-        
+
+def isindep(l):
+    for j in range(1,len(l)):
+        if not isinstance(Matv(l[j],l[:j],indep_prompt=False),(int)): 
+            return False
+    return True
+def mkindep(l):
+    pass
+
 def getD(space):
     if re.match(r'F.',space):
         return int(re.search(r'\d',space).group())
@@ -291,3 +310,5 @@ def realize(Mat,tol = 1e-10):
     if (abs(Mat.imag) < tol).all():
         return np.real(M)
     return M
+
+
