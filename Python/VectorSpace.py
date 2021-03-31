@@ -57,12 +57,13 @@ InvMatv(mat,base) - returns the vector of 'mat' using 'base'
 Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wBase'
 invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
 isindep(l) - Checks if a list of vectors is linearly independent
+mkindep(l) - Reduces a list of vectors into a list of independent vectors
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 sym2num(Mat) - turns the sympy matrix into numpy array
 realize(Mat) - sets small floats to zero
 """
-import warnings 
+
 import sympy as sym
 import numpy as np
 import scipy.linalg as la
@@ -217,6 +218,9 @@ def basis(space):
         return B
 
 def Gram(base):
+    if not isindep(base):
+        print('Warning: Base in linearly dependent, removing dependency')
+        base = mkindep(base)
     eBase = base.copy()
     eBase[0] = base[0].normalize()
     for i in range(1,len(base)):
@@ -278,7 +282,10 @@ def isindep(l):
             return False
     return True
 def mkindep(l):
-    pass
+    out = [l[0]]
+    for v in l[1:]:
+        if isindep([*out,v]): out.append(v)
+    return out     
 
 def getD(space):
     if re.match(r'F.',space):
