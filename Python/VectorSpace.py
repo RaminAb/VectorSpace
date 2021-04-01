@@ -1,6 +1,5 @@
 """
 Credit : Ramin Abbasi
-Update : 03/16/2021
 ========================
 Vector Space (VS) Package
 ========================
@@ -24,13 +23,14 @@ and the following methods:
     1) doc  : sets the linMap documentation
     2) prod : multiplies two linMaps
     3) null : nullspace of a linMap
-    4) eig  : eigen_val and eigen_vec of linMap
-    5) trace: trace of the operator
-    6) det  : determinant of the operator
-    7) char : characteristic polynomial of the operator
-    8) diag : triangular or diagonal form of the operator
-    9) Adj  : adjoint of linMap
-    10) svd : singular value decomposition
+    4) range: range of a linMap
+    5) eig  : eigen_val and eigen_vec of linMap
+    6) trace: trace of the operator
+    7) det  : determinant of the operator
+    8) char : characteristic polynomial of the operator
+    9) diag : triangular or diagonal form of the operator
+    10) Adj  : adjoint of linMap
+    11) svd : singular value decomposition
     
 vector
 ------  
@@ -58,9 +58,10 @@ Mat(lMap,vBase,wBase) - returns the matrix of 'lMap' using two bases 'vBase','wB
 invMat(mat,vBase,wBase) - returns the linMap of 'mat' using two bases 'vBase','wBase'
 isindep(l) - Checks if a list of vectors is linearly independent
 mkindep(l) - Reduces a list of vectors into a list of independent vectors
+mkbasis(l) - Turns (reduce or extend) a list into a basis
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
-sym2num(Mat) - turns the sympy matrix into numpy array
+numerize(Mat) - turns the sympy matrix into numpy array
 realize(Mat) - sets small floats to zero
 """
 
@@ -68,7 +69,8 @@ import sympy as sym
 import numpy as np
 import scipy.linalg as la
 import re
-
+sym.init_printing(pretty_print=False)
+tol = 1e-10
 #========================================================================= 
 # Classes
 #========================================================================= 
@@ -79,8 +81,7 @@ class linMap:
         self.V = V
         self.W = W
     def __call__(self,v):
-        if re.match(r'P.',self.V): return sym2num(vector(self.fun(v.vec).evalf(6),self.W))
-        if re.match(r'F.',self.V): return sym2num(vector(self.fun(v.vec),self.W))
+        return numerize(vector(self.fun(v.vec),self.W))
     def __mul__(self,scalar):
         return linMap(lambda x: scalar*self.fun(x),self.V,self.W)
     __rmul__=__mul__
@@ -94,7 +95,7 @@ class linMap:
         if re.match(r'F.',self.V):
             n = getD(self.V)
             z = sym.symbols('z0:%d'%n)
-            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,z, self.fun(z),self.fun.__doc__)
+            return 'lMap({}->{}): {} ==> ({}) {}'.format(self.V,self.W,z, str(self.fun(z))[1:-1],self.fun.__doc__)
         if re.match(r'P.',self.V):
             n = getD(self.V)
             p = invMatv(np.ones(n),basis(self.V))
@@ -113,6 +114,9 @@ class linMap:
         N = la.null_space(Mat(self,vBase,wBase)).transpose()
         if N.size == 0 : return [zerov(self.V)]
         return [invMatv(M,vBase) for M in N]
+    def range(self):
+        vBase = basis(self.V)
+        return numerize(mkindep([self(v) for v in vBase]))
     def eig(self):
         vBase = Gram(basis(self.V))
         wBase = Gram(basis(self.V))
@@ -123,12 +127,12 @@ class linMap:
         eig_mlt = []
         for ev,algmlt in zip(eigen_val,alg_mlt):
             nill = M - ev*np.eye(n)
-            geo_mlt = la.null_space(nill,rcond=1e-10).shape[1]
-            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt),rcond=1e-10))
+            geo_mlt = la.null_space(nill,rcond=tol).shape[1]
+            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt),rcond=tol))
             eig_mlt.append((ev,algmlt,geo_mlt))
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
-        return eig_mlt,sym2num(eigen)
+        return eig_mlt,numerize(eigen)
     def trace(self):
         return sum([ev[1]*ev[0] for ev in self.eig()[0]])
     def det(self):
@@ -169,7 +173,8 @@ class vector:
     def __sub__(self,other):
         return vector(self.vec-other.vec,self.space)
     def __str__(self):
-        return '{}'.format(self.vec)
+        if re.match(r'F.',self.space): return '({})'.format(str(self.vec)[1:-1])
+        if re.match(r'P.',self.space): return '{}'.format(self.vec)
     def __repr__(self):
         return str(self)
     def innerproduct(self,other):
@@ -190,7 +195,7 @@ class vector:
 #========================================================================= 
 # Linear Map Functions
 #========================================================================= 
-        
+
 def vectors(array,space):
     return list(map(lambda x: vector(x,space) , array))
 
@@ -199,7 +204,7 @@ def zerov(space):
     if re.match(r'F.',space):
         return vector([0]*getD(space),space)
     if re.match(r'P.',space):
-        return vector([0],space) 
+        return vector(0,space) 
 
 def eye(space):
     n = getD(space)
@@ -228,7 +233,7 @@ def Gram(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
-def Matv(v,base, symnum = True, indep_prompt = True):
+def Matv(v,base, numer = True, indep_prompt = True):
     if re.match(r'P.',base[0].space):
         n = len(base)
         c = sym.symbols('c0:{}'.format(n))
@@ -241,22 +246,24 @@ def Matv(v,base, symnum = True, indep_prompt = True):
 
         Eq = (Base_Poly-Vec_Poly).all_coeffs()
         Coef = sym.linsolve(Eq,c)
+        
         if len(Coef) < 1 or len(Coef.free_symbols) > 0:
             if indep_prompt: 
                 print('Warning: Improper base! Returning 0')
             return 0
         res = np.array(Coef.args[0])[:,np.newaxis]
-        return res.astype('float') if symnum else res
+        return res.astype('float') if numer else res
 
     if re.match(r'F.',base[0].space):
         B = sym.Matrix([(b.vec).T for b in base]).T
-        res = B.pinv()*(v.vec)[:,np.newaxis]
-        chk = B*B.pinv()*v.vec[:,np.newaxis]-v.vec[:,np.newaxis]
-        if B.rank() < B.shape[1] or chk.norm() > 1e-6:
+        res = B.pinv()*v.vec[:,np.newaxis]
+        chk = B*res-v.vec[:,np.newaxis]
+        
+        if chk.norm() > tol:
             if indep_prompt:
                 print('Warning: Improper base! Returning 0')
             return 0
-        return sym2num(res) if symnum else res
+        return numerize(res) if numer else res
 
 def invMatv(mat,base):
     vec = sum([mat[i]*base[i].vec for i in range(len(base))])
@@ -270,22 +277,36 @@ def invMat(mat,vBase,wBase, doc = ""):
     def F(x):
         F.__doc__ = doc
         vx = vector(x,vBase[0].space)
-        x_vec = Matv(vx,vBase,symnum=False)
+        x_vec = Matv(vx,vBase,numer=False)
         if isinstance(mat,(np.ndarray)) and isinstance(x_vec,(np.ndarray)):
             x_vec = sym.Matrix(x_vec)
         return (invMatv(mat*x_vec,wBase)).vec
     return linMap(F,vBase[0].space,wBase[0].space)
 
 def isindep(l):
+    zero_idx = 0
+    while l[zero_idx].norm() < tol: 
+        zero_idx += 1
+        if zero_idx == len(l)-1 : break
     for j in range(1,len(l)):
         if not isinstance(Matv(l[j],l[:j],indep_prompt=False),(int)): 
             return False
-    return True
+    return True and zero_idx == 0
+
 def mkindep(l):
+    zero_idx = 0
+    while l[zero_idx].norm() < tol: 
+        zero_idx += 1
+        if zero_idx == len(l)-1 : break
+    l = l[zero_idx:]
     out = [l[0]]
     for v in l[1:]:
         if isindep([*out,v]): out.append(v)
-    return out     
+    return out   
+
+def mkbasis(l,space):
+    extended = [*l,*basis(space)]
+    return mkindep(extended)
 
 def getD(space):
     if re.match(r'F.',space):
@@ -296,26 +317,28 @@ def getD(space):
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
 
-def sym2num(Mat):
+def numerize(Mat):
     if isinstance(Mat,(list)):
-        return [sym2num(v) for v in Mat]
+        return [numerize(v) for v in Mat]
     if isinstance(Mat,(vector)):
         if isinstance (Mat.vec,(np.ndarray)):
             return vector((Mat.vec).astype('float'),Mat.space)
-        if isinstance (Mat.vec,(sym.Basic)):
+        if isinstance (Mat.vec,(sym.Basic)):          
             return vector((Mat.vec).evalf(),Mat.space)
     return np.array(Mat).astype('float')
 
-def realize(Mat,tol = 1e-10):
+def realize(Mat,Tol = tol):
     if isinstance (Mat,(list)):
         return [realize(v) for v in Mat]
     if isinstance (Mat,(vector)):
         return realize(Mat.vec)
-    M = Mat.astype(np.complex)
-    M.real[abs(Mat.real) < tol] = 0.0
-    M.imag[abs(Mat.imag) < tol] = 0.0
-    if (abs(Mat.imag) < tol).all():
-        return np.real(M)
-    return M
+    else:
+        M = Mat.astype(np.complex)
+        M.real[abs(Mat.real) < Tol] = 0.0
+        M.imag[abs(Mat.imag) < Tol] = 0.0
+        if (abs(Mat.imag) < Tol).all():
+            return np.real(M)
+        return M
+
 
 
