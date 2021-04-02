@@ -18,6 +18,7 @@ pList = vs.vectors([0,1,x,0,x**2-1,2*x],'P2')
 v = vs.vector([1,2,3],'F3')
 p = vs.vector(1+2*x+3*x**2,'P2')
 
+
 def f(X):
     """A Linear Map!"""
     return [X[0]+2*X[1]+X[2],2*X[1],3*X[2]]
@@ -80,6 +81,9 @@ print("I (F2): ",vs.eye('F2'))
 print("I (P1): ",vs.eye('P1'))
 print("T: ",T)
 print("R: ",R)
+print("T(v+w) == T(v) + T(w): ",T(v+w) == T(v) + T(w))
+print("R(p+q) == R(p) + R(q): ",T(v+w) == T(v) + T(w))
+print("T+T == 2*T:",T+T == 2*T)
 print("T(v): ",w)
 print("R(p): ",q)
 print("M(v):\n",v_vec)

@@ -82,8 +82,11 @@ class linMap:
         self.W = W
     def __call__(self,v):
         return numerize(vector(self.fun(v.vec),self.W))
-    def __mul__(self,scalar):
-        return linMap(lambda x: scalar*self.fun(x),self.V,self.W)
+    def __mul__(self,other):
+        if type(self) == type(other):
+            return self.prod(other)
+        else:
+            return linMap(lambda x: other*self.fun(x),self.V,self.W)
     __rmul__=__mul__
     def __truediv__(self,scalar):
         return linMap(lambda x: self.fun(x)/scalar,self.V,self.W)
@@ -102,6 +105,12 @@ class linMap:
             return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
+    def __eq__(self,other):
+        if self.V == other.V and self.W == other.W:
+            return self.range() == other.range()
+        else: return False
+    def __ne__(self,other):
+        return not (self == other)
     def doc(self,document):
         self.fun.__doc__ = document
     def prod(self,other):
@@ -177,6 +186,12 @@ class vector:
         if re.match(r'P.',self.space): return '{}'.format(self.vec)
     def __repr__(self):
         return str(self)
+    def __eq__(self,other):
+        if self.space == other.space:
+            return (np.array(self.vec) == np.array(other.vec)).all()
+        else: return False
+    def __ne__(self,other):
+        return not (self == other)
     def innerproduct(self,other):
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
