@@ -62,7 +62,7 @@ mkbasis(l) - Turns (reduce or extend) a list into a basis
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 numerize(Mat) - turns the sympy matrix into numpy array
-realize(Mat) - sets small floats to zero
+realize(Mat) - rounds small floats to zero
 """
 
 import sympy as sym
@@ -164,6 +164,10 @@ class linMap:
         vBase = Gram(basis(self.V))
         wBase = Gram(basis(self.W))
         return invMat(la.inv(Mat(self,vBase,wBase)),wBase,vBase)    
+    def pinv(self):
+        vBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.W))
+        return invMat(la.pinv(Mat(self,vBase,wBase)),wBase,vBase)  
     def svd(self):
         sv_right = (self.adj().prod(self)).eig() 
         sv_left = (self.prod(self.adj())).eig()
@@ -191,8 +195,6 @@ class vector:
     def __str__(self):
         if re.match(r'F.',self.space): return '({})'.format(str(self.vec)[1:-1])
         if re.match(r'P.',self.space):
-            if isinstance(self.vec,(sym.Float)):
-                return '{}'.format(sym.Float(self.vec,3))
             return '{}'.format(self.vec)
     def __repr__(self):
         return str(self)
@@ -366,16 +368,26 @@ def numerize(Mat):
             return vector((Mat.vec).evalf(),Mat.space)
     return np.array(Mat).astype('float')
 
-def realize(Mat,Tol = tol):
-    if isinstance (Mat,(list)):
-        return [realize(v) for v in Mat]
-    if isinstance (Mat,(vector)):
-        return realize(Mat.vec)
-    else:
-        M = Mat.astype(np.complex)
-        M.real[abs(Mat.real) < Tol] = 0.0
-        M.imag[abs(Mat.imag) < Tol] = 0.0
-        if (abs(Mat.imag) < Tol).all():
+def realize(Obj,digits = 3, Tol = tol):
+    if isinstance(Obj,(linMap)):
+        vBase = basis(Obj.V)
+        wBase = basis(Obj.W)
+        return invMat(realize(Mat(Obj,vBase,wBase), digits, Tol),vBase,wBase)  
+    if isinstance (Obj,(list)):
+        return [realize(v,digits, Tol) for v in Obj]
+    if isinstance (Obj,(vector)):
+        return realize(Obj.vec,digits,Tol)
+    if isinstance(Obj,(sym.Basic)):
+        if isinstance(Obj,(sym.Float)):
+            return sym.Float(Obj,digits)
+        else:
+            return Obj.evalf(digits)
+    if isinstance (Obj,(np.ndarray)):
+        M = Obj.astype(np.complex)
+        M.real[abs(Obj.real) < Tol] = 0.0
+        M.imag[abs(Obj.imag) < Tol] = 0.0
+        M = np.around(M,digits)
+        if (abs(Obj.imag) < Tol).all():
             return np.real(M)
         return M
 
