@@ -2,9 +2,10 @@
 Checks VectorSpace functionality by touching almost all defined functions
 """
 import VectorSpace as vs
-import sympy as sym
+from sympy import Symbol, diff
+from numpy import array
 
-x = sym.Symbol('x')
+x = Symbol('x')
 
 vBase = vs.vectors([[1,2,0],[0,1,3],[1,0,1]],'F3')
 wBase = vs.vectors([[1,0,0],[0,1,0],[0,0,1]],'F3')
@@ -21,17 +22,20 @@ p = vs.vector(1+2*x+3*x**2,'P2')
 
 def f(X):
     """A Linear Map!"""
-    return [X[0]+2*X[1]+X[2],2*X[1],3*X[2]]
+    return array([X[0]+X[1]+X[2],2*X[1],2*X[2]])
 def g(p):
     """ Differential Map!"""
-    return sym.diff(p,x)
+    return diff(p,x)
+def h(X):
+    """A Linear Map!"""
+    return array([X[0],X[0]+X[1],0])    
 
 v0 = vs.zerov('F3')
 p0 = vs.zerov('P1')
 
 T = vs.linMap(f,'F3','F3')
 R = vs.linMap(g,'P2','P1')
-
+S = vs.linMap(h,'F3','F3')
 
 w = T(v)
 q = R(p)
@@ -83,6 +87,7 @@ print("T: ",T)
 print("R: ",R)
 print("T(v+w) == T(v) + T(w): ",T(v+w) == T(v) + T(w))
 print("R(p+q) == R(p) + R(q): ",T(v+w) == T(v) + T(w))
+print("T*(T+S) == T*T + T*S: ",T*(T+S) == T*T + T*S)
 print("T+T == 2*T:",T+T == 2*T)
 print("T(v): ",w)
 print("R(p): ",q)
@@ -98,17 +103,22 @@ print("iM(M(T)): ",T_mat_inv)
 print("iM(M(R)): ",R_mat_inv)
 print("iM(M(T))(v): ",T_mat_inv(v))
 print("iM(M(R))(p): ",R_mat_inv(p))
-print("T*: ",T.Adj())
-print("R*: ",R.Adj())
+print("T*: ",T.adj())
+print("R*: ",R.adj())
 print("Null(T): ",T_null)
 print("Null(R): ",R_null)
+print("is T injective: ", vs.isinj(T))
+print("is R injective: ", vs.isinj(R))
+print("is T surjective: ", vs.issurj(T))
+print("is R surjective: ", vs.issurj(R))
+print("T.inv(): ", T.inv())
 print("Range(T): ",T_range)
 print("Range(R): ",R_range)
 print("eigen(T): ",T.eig()[0])
 print("trace(T): ",T.trace())
 print("det(T)  : ",T.det())
 print("Char(T) : ",T.char())
-print("Diag(T) :\n",vs.realize(T.diag(),Tol=1e-10))
-print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT),Tol=1e-10))
-print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR),Tol=1e-10))
+print("Diag(T) :\n",vs.realize(T.diag()))
+print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT)))
+print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR)))
 print("U:\n",vs.U(wBase,vBase))

@@ -29,7 +29,7 @@ and the following methods:
     7) det  : determinant of the operator
     8) char : characteristic polynomial of the operator
     9) diag : triangular or diagonal form of the operator
-    10) Adj  : adjoint of linMap
+    10) adj  : adjoint of linMap
     11) svd : singular value decomposition
     
 vector
@@ -153,13 +153,20 @@ class linMap:
     def diag(self):
         eig_mlt, eigen = self.eig()
         return Mat(self,eigen,eigen)
-    def Adj(self):
+    def adj(self):
         vBase = Gram(basis(self.V))
         wBase = Gram(basis(self.W))
         return invMat(Mat(self,vBase,wBase).transpose().conjugate(),wBase,vBase)
+    def inv(self):
+        if not isbij(self):
+            print("Linear Map not invertible! Returning 0")
+            return 0
+        vBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.W))
+        return invMat(la.inv(Mat(self,vBase,wBase)),wBase,vBase)    
     def svd(self):
-        sv_right = (self.Adj().prod(self)).eig() 
-        sv_left = (self.prod(self.Adj())).eig()
+        sv_right = (self.adj().prod(self)).eig() 
+        sv_left = (self.prod(self.adj())).eig()
         sv = [np.sqrt(ev[0]) for ev in sv_right[0]]
         e = sv_right[1]
         f = sv_left[1]
@@ -183,7 +190,10 @@ class vector:
         return vector(self.vec-other.vec,self.space)
     def __str__(self):
         if re.match(r'F.',self.space): return '({})'.format(str(self.vec)[1:-1])
-        if re.match(r'P.',self.space): return '{}'.format(self.vec)
+        if re.match(r'P.',self.space):
+            if isinstance(self.vec,(sym.Float)):
+                return '{}'.format(sym.Float(self.vec,3))
+            return '{}'.format(self.vec)
     def __repr__(self):
         return str(self)
     def __eq__(self,other):
@@ -313,6 +323,7 @@ def mkindep(l):
     while l[zero_idx].norm() < tol: 
         zero_idx += 1
         if zero_idx == len(l)-1 : break
+        if len(l) == 1: return l
     l = l[zero_idx:]
     out = [l[0]]
     for v in l[1:]:
@@ -322,6 +333,19 @@ def mkindep(l):
 def mkbasis(l,space):
     extended = [*l,*basis(space)]
     return mkindep(extended)
+
+def isinj(T):
+    Null = mkindep(T.null())
+    if len(Null) == 1 and Null[0].norm() < tol :
+        return True
+    else: return False
+def issurj(T):
+    Range = T.range()
+    if len(Range) == getD(T.W) and Range[0].norm() > tol:
+        return True
+    else: return False
+def isbij(T):
+    return issurj(T) and isinj(T)
 
 def getD(space):
     if re.match(r'F.',space):
@@ -338,7 +362,7 @@ def numerize(Mat):
     if isinstance(Mat,(vector)):
         if isinstance (Mat.vec,(np.ndarray)):
             return vector((Mat.vec).astype('float'),Mat.space)
-        if isinstance (Mat.vec,(sym.Basic)):          
+        if isinstance (Mat.vec,(sym.Basic)):
             return vector((Mat.vec).evalf(),Mat.space)
     return np.array(Mat).astype('float')
 
@@ -354,6 +378,4 @@ def realize(Mat,Tol = tol):
         if (abs(Mat.imag) < Tol).all():
             return np.real(M)
         return M
-
-
 
