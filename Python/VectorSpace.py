@@ -29,8 +29,10 @@ and the following methods:
     7) det  : determinant of the operator
     8) char : characteristic polynomial of the operator
     9) diag : triangular or diagonal form of the operator
-    10) adj  : adjoint of linMap
-    11) svd : singular value decomposition
+    10) adj : adjoint of linMap
+    11) inv : inverse of linMap
+    12) pinv: pseudo-inverse of linMap
+    13) svd : singular value decomposition
     
 vector
 ------  
@@ -81,7 +83,7 @@ class linMap:
         self.V = V
         self.W = W
     def __call__(self,v):
-        return numerize(vector(self.fun(v.vec),self.W))
+        return vector(self.fun(v.vec),self.W)
     def __mul__(self,other):
         if type(self) == type(other):
             return self.prod(other)
@@ -125,7 +127,7 @@ class linMap:
         return [invMatv(M,vBase) for M in N]
     def range(self):
         vBase = basis(self.V)
-        return numerize(mkindep([self(v) for v in vBase]))
+        return mkindep([self(v) for v in vBase])
     def eig(self):
         vBase = Gram(basis(self.V))
         wBase = Gram(basis(self.V))
@@ -141,7 +143,7 @@ class linMap:
             eig_mlt.append((ev,algmlt,geo_mlt))
         eigen_vec = np.concatenate(eigen_vec,axis=1)
         eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
-        return eig_mlt,numerize(eigen)
+        return eig_mlt,eigen
     def trace(self):
         return sum([ev[1]*ev[0] for ev in self.eig()[0]])
     def det(self):
@@ -279,21 +281,37 @@ def Matv(v,base, numer = True, indep_prompt = True):
                 print('Warning: Improper base! Returning 0')
             return 0
         res = np.array(Coef.args[0])[:,np.newaxis]
-        return res.astype('float') if numer else res
 
     if re.match(r'F.',base[0].space):
-        B = sym.Matrix([(b.vec).T for b in base]).T
-        res = B.pinv()*v.vec[:,np.newaxis]
-        chk = B*res-v.vec[:,np.newaxis]
+        cmplx_check = any(b.vec.dtype == np.complex for b in base)
+        if cmplx_check and numer:
+            v = vector(v.vec.astype('complex'),v.space)
+            B = np.array([(b.vec).T for b in base]).astype('complex').transpose()
+            res = np.array(la.pinv(B).dot(v.vec[:,np.newaxis]))
+            chk = B.dot(res)-v.vec[:,np.newaxis]
+            cmplx = 0 if la.norm(res.imag) < tol else 1 
+            return res.astype('complex') if cmplx else np.real(res)
         
+        B = sym.Matrix([(b.vec).T for b in base]).T
+        res = np.array(B.pinv()*v.vec[:,np.newaxis])
+        chk = B*res-v.vec[:,np.newaxis]
         if chk.norm() > tol:
             if indep_prompt:
                 print('Warning: Improper base! Returning 0')
             return 0
-        return numerize(res) if numer else res
+        
+    return res.astype('float') if numer else res
+        
 
 def invMatv(mat,base):
-    vec = sum([mat[i]*base[i].vec for i in range(len(base))])
+    if isinstance (mat,(np.ndarray)) and re.match(r'F.',base[0].space): 
+        cmplx = 0 if la.norm(mat.imag) < tol else 1
+        dtype = 'complex' if cmplx else 'float'
+        M = mat.astype(np.complex)
+        if not cmplx: M = np.real(M)
+        vec = sum([(M[i]*base[i].vec).astype(dtype) for i in range(len(base))])
+    else:
+        vec = sum([(mat[i]*base[i].vec) for i in range(len(base))])
     if re.match(r'F.',base[0].space): return vector(vec,base[0].space)
     if re.match(r'P.',base[0].space): return vector(sym.Matrix([vec])[0],base[0].space)
 
@@ -358,23 +376,13 @@ def getD(space):
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
 
-def numerize(Mat):
-    if isinstance(Mat,(list)):
-        return [numerize(v) for v in Mat]
-    if isinstance(Mat,(vector)):
-        if isinstance (Mat.vec,(np.ndarray)):
-            return vector((Mat.vec).astype('float'),Mat.space)
-        if isinstance (Mat.vec,(sym.Basic)):
-            return vector((Mat.vec).evalf(),Mat.space)
-    return np.array(Mat).astype('float')
-
 def realize(Obj,digits = 3, Tol = tol):
+    if isinstance (Obj,(list)):
+        return [realize(v,digits, Tol) for v in Obj]
     if isinstance(Obj,(linMap)):
         vBase = basis(Obj.V)
         wBase = basis(Obj.W)
         return invMat(realize(Mat(Obj,vBase,wBase), digits, Tol),vBase,wBase)  
-    if isinstance (Obj,(list)):
-        return [realize(v,digits, Tol) for v in Obj]
     if isinstance (Obj,(vector)):
         return realize(Obj.vec,digits,Tol)
     if isinstance(Obj,(sym.Basic)):
@@ -384,10 +392,19 @@ def realize(Obj,digits = 3, Tol = tol):
             return Obj.evalf(digits)
     if isinstance (Obj,(np.ndarray)):
         M = Obj.astype(np.complex)
-        M.real[abs(Obj.real) < Tol] = 0.0
-        M.imag[abs(Obj.imag) < Tol] = 0.0
         M = np.around(M,digits)
-        if (abs(Obj.imag) < Tol).all():
+        if (abs(M.imag) < Tol).all():
             return np.real(M)
         return M
 
+
+
+#def numerize(Mat):
+#    if isinstance(Mat,(list)):
+#        return [numerize(v) for v in Mat]
+#    if isinstance(Mat,(vector)):
+#        if isinstance (Mat.vec,(np.ndarray)):
+#            return vector((Mat.vec).astype('float'),Mat.space)
+#        if isinstance (Mat.vec,(sym.Basic)):
+#            return vector((Mat.vec).evalf(),Mat.space)
+#    return np.array(Mat).astype('float')
