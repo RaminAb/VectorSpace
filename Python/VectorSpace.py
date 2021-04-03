@@ -99,13 +99,15 @@ class linMap:
         return linMap(lambda x: self.fun(x)-other.fun(x),self.V,self.W)
     def __str__(self):
         if re.match(r'F.',self.V):
-            n = getD(self.V)
-            z = sym.symbols('z0:%d'%n)
-            return 'lMap({}->{}): {} ==> ({}) {}'.format(self.V,self.W,z, str(self.fun(z))[1:-1],self.fun.__doc__)
+#            n = getD(self.V)
+#            z = sym.symbols('z0:%d'%n)
+            return 'lMap'
+#            return 'lMap({}->{}): {} ==> ({}) {}'.format(self.V,self.W,z, str(self.fun(z))[1:-1],self.fun.__doc__)
         if re.match(r'P.',self.V):
-            n = getD(self.V)
-            p = invMatv(np.ones(n),basis(self.V))
-            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
+#            n = getD(self.V)
+#            p = invMatv(np.ones(n),basis(self.V))
+            return 'lMap'
+#            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
     def __eq__(self,other):
@@ -213,7 +215,8 @@ class vector:
         if re.match(r'P.',self.space):
             return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-1,1))
     def norm(self):
-        return sym.sqrt(self.innerproduct(self))
+        if re.match(r'F.',self.space): return np.sqrt(self.innerproduct(self))
+        if re.match(r'P.',self.space): return sym.sqrt(self.innerproduct(self))
     def normalize(self):
         return self/self.norm()
     def initial(self):
@@ -238,14 +241,14 @@ def zerov(space):
 
 def eye(space):
     n = getD(space)
-    I = invMat(sym.eye(n),basis(space),basis(space),doc = "Identity")
+    I = invMat(np.eye(n),basis(space),basis(space),doc = "Identity")
     return I
 
 def basis(space):
     n = getD(space)
     if re.match(r'F.',space):
-        base = sym.Matrix.diag([1]*n)
-        B = vectors([base.row(i)[:] for i in range(n)],space)
+        base = np.eye(n)
+        B = vectors(base,space)
         return B
     if re.match(r'P.',space):
         x = sym.symbols('x')
@@ -253,9 +256,6 @@ def basis(space):
         return B
 
 def Gram(base):
-    if not isindep(base):
-        print('Warning: Base in linearly dependent, removing dependency')
-        base = mkindep(base)
     eBase = base.copy()
     eBase[0] = base[0].normalize()
     for i in range(1,len(base)):
@@ -263,7 +263,7 @@ def Gram(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
-def Matv(v,base, numer = True, indep_prompt = True):
+def Matv(v,base, indep_prompt = True):
     if re.match(r'P.',base[0].space):
         n = len(base)
         c = sym.symbols('c0:{}'.format(n))
@@ -277,43 +277,28 @@ def Matv(v,base, numer = True, indep_prompt = True):
         Eq = (Base_Poly-Vec_Poly).all_coeffs()
         Coef = sym.linsolve(Eq,c)
         
-
         if len(Coef) < 1 or len(Coef.free_symbols) > 0:
             if indep_prompt: 
                 print('Warning: Improper base! Returning 0')
             return 0
-        res = np.array(Coef.args[0])[:,np.newaxis]
+        dtype = 'float'
+        if any(abs(sym.im(c))>tol for c in Coef.args[0]): dtype = 'complex'
+        res = np.array(Coef.args[0])[:,np.newaxis].astype(dtype)
 
     if re.match(r'F.',base[0].space):
-        cmplx_check = any(b.vec.dtype == np.complex for b in base)
-        if cmplx_check and numer:
-            v = vector(v.vec.astype('complex'),v.space)
-            B = np.array([(b.vec).T for b in base]).astype('complex').transpose()
-            res = np.array(la.pinv(B).dot(v.vec[:,np.newaxis]))
-            chk = B.dot(res)-v.vec[:,np.newaxis]
-            cmplx = 0 if la.norm(res.imag) < tol else 1 
-            return res.astype('complex') if cmplx else np.real(res)
+        B = np.array([(b.vec).transpose() for b in base]).transpose()
+        res = np.array(la.pinv(B).dot(v.vec[:,np.newaxis]))
+        chk = B.dot(res)-v.vec[:,np.newaxis]
         
-        B = sym.Matrix([(b.vec).T for b in base]).T
-        res = np.array(B.pinv()*v.vec[:,np.newaxis])
-        chk = B*res-v.vec[:,np.newaxis]
-        if chk.norm() > tol:
+        if la.norm(chk) > tol:
             if indep_prompt:
                 print('Warning: Improper base! Returning 0')
             return 0
-        
-    return res.astype('float') if numer else res
+    return res
         
 
 def invMatv(mat,base):
-    if isinstance (mat,(np.ndarray)) and re.match(r'F.',base[0].space): 
-        cmplx = 0 if la.norm(mat.imag) < tol else 1
-        dtype = 'complex' if cmplx else 'float'
-        M = mat.astype(np.complex)
-        if not cmplx: M = np.real(M)
-        vec = sum([(M[i]*base[i].vec).astype(dtype) for i in range(len(base))])
-    else:
-        vec = sum([(mat[i]*base[i].vec) for i in range(len(base))])
+    vec = sum([(mat[i]*base[i].vec) for i in range(len(base))])
     if re.match(r'F.',base[0].space): return vector(vec,base[0].space)
     if re.match(r'P.',base[0].space): return vector(sym.Matrix([vec])[0],base[0].space)
 
@@ -324,10 +309,8 @@ def invMat(mat,vBase,wBase, doc = ""):
     def F(x):
         F.__doc__ = doc
         vx = vector(x,vBase[0].space)
-        x_vec = Matv(vx,vBase,numer=False)
-        if isinstance(mat,(np.ndarray)) and isinstance(x_vec,(np.ndarray)):
-            x_vec = sym.Matrix(x_vec)
-        return (invMatv(mat*x_vec,wBase)).vec
+        x_vec = Matv(vx,vBase)
+        return (invMatv(mat.dot(x_vec),wBase)).vec
     return linMap(F,vBase[0].space,wBase[0].space)
 
 def isindep(l):

@@ -66,7 +66,6 @@ R_range = R.range()
 svT,eT,fT = T.svd()
 svR,eR,fR = R.svd()
 
-
 M = np.array([[0,1],[-1,0]])
 T_M = vs.invMat(M,vs.basis('F2'),vs.basis('F2'))
 R_M = vs.invMat(M,vs.basis('P1'),vs.basis('P1'))
@@ -123,8 +122,6 @@ print("iM(M(T)): ",T_mat_inv)#
 print("iM(M(R)): ",R_mat_inv)#
 print("iM(M(T))(v): ",vs.realize(T_mat_inv(v)))#
 print("iM(M(R))(p): ",R_mat_inv(p))#
-
-
 print("Diag(T) :\n",vs.realize(T.diag()))
 print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT)))
 print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR),digits = 3))
