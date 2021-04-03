@@ -64,7 +64,7 @@ mkbasis(l) - Turns (reduce or extend) a list into a basis
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
 numerize(Mat) - turns the sympy matrix into numpy array
-realize(Mat) - rounds small floats to zero
+real(Mat) - rounds small floats to zero
 """
 
 import sympy as sym
@@ -140,6 +140,8 @@ class linMap:
         return det(self)
     def char(self):
         return char(self)
+    def poly(self):
+        return poly(self)
     def diag(self):
         return diag(self)
     def jordan(self):
@@ -378,6 +380,12 @@ def char(T):
     z = sym.symbols('z')
     poly = [(z-ev[0])**ev[1] for ev in T.eig()[0]]
     return sym.expand(np.prod(np.array(poly)))
+
+def poly(T):
+    z = sym.symbols('z')
+    poly = [(z-ev[0])**ev[1] for ev in T.jordan()[2]]
+    return sym.expand(np.prod(np.array(poly)))
+
 def diag(T):
     eig_mlt, eigen = T.eig()
     return Mat(T,eigen,eigen)
@@ -386,22 +394,23 @@ def jordan(T):
     n = getD(T.V)
     I = eye(T.V)
     eigen = T.eig()[0]
-    Null = [T-e[0]*I for e in eigen]
-    Idx = []
-    for N in Null:
+    min_deg = []
+    for e in eigen:
+        N = T-e[0]*I
+        Idx = []
         V = (N**n).null()
         for j in range(0,n+2):
             Idx.append(_find_idx(V,lambda x: not isindep([(N**j)(x)])))
         Index = [j-i for i,j in zip(Idx[:-1],Idx[1:])]
-        v_idx = Index[max(_find_idx(Index, lambda x: len(x) != 0))]
+        min_deg.append((e[0],len(list(_find_idx(Index, lambda x: len(x) != 0)))))
+        v_idx = sum([list(i) for i in Index],[])[::-1]
         v_list = [[V[i]] for i in v_idx]
         for v in v_list:
             for j in range(n+1):
-                v.insert(0,N(v[0]))    
+                v.insert(0,N(v[0]))
         Base.append([mkindep(v) for v in v_list])
-    Base = sum(sum(Base,[]),[])
-    
-    return Mat(T,Base,Base),Base
+    Base = mkindep(sum(sum(Base,[]),[]))
+    return Mat(T,Base,Base),Base,min_deg
 def adj(T):
     vBase = Gram(basis(T.V))
     wBase = Gram(basis(T.W))
@@ -428,15 +437,15 @@ def svd(T):
 #========================================================================= 
 # Utilities
 #========================================================================= 
-def realize(Obj,digits = 3, Tol = tol):
+def real(Obj,digits = 3, Tol = tol):
     if isinstance (Obj,(list)):
-        return [realize(v,digits, Tol) for v in Obj]
+        return [real(v,digits, Tol) for v in Obj]
     if isinstance(Obj,(linMap)):
         vBase = basis(Obj.V)
         wBase = basis(Obj.W)
-        return invMat(realize(Mat(Obj,vBase,wBase), digits, Tol),vBase,wBase)  
+        return invMat(real(Mat(Obj,vBase,wBase), digits, Tol),vBase,wBase)  
     if isinstance (Obj,(vector)):
-        return vector(realize(Obj.vec,digits,Tol),Obj.space)
+        return vector(real(Obj.vec,digits,Tol),Obj.space)
     
     if isinstance(Obj,(sym.Basic)):
         if isinstance(Obj,(sym.Float)):

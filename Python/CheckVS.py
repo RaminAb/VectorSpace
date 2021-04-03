@@ -97,10 +97,10 @@ print("R(p): ",q)#
 print("Null(T): ",T_null)#
 print("Null(R): ",R_null)#
 print("Range(T): ",T_rnge)#
-print("Range(R): ",vs.realize(R_rnge))#
+print("Range(R): ",vs.real(R_rnge))#
 print("T.inv(): ", T.inv())#
-print("T*T.inv(): ",T*T.inv())
-print("T.pinv(): ", vs.realize(T.pinv()))#
+print("T*T.inv(): ",T*T.inv())#
+print("T.pinv(): ", vs.real(T.pinv()))#
 print("is T injective: ", vs.isinj(T))#
 print("is R injective: ", vs.isinj(R))#
 print("is T surjective: ", vs.issurj(T))#
@@ -110,7 +110,7 @@ print("trace(T): ",T.trace())#
 print("det(T)  : ",T.det())#
 print("Char(T) : ",T.char())#
 print("T*: ",T.adj())#
-print("R*: ",vs.realize(R.adj()))#
+print("R*: ",vs.real(R.adj()))#
 print("M(v):\n",v_vec)#
 print("M(p):\n",p_vec)#
 print("M(T):\n",T_mat)#
@@ -119,16 +119,16 @@ print("iM(M(v)): ",v_vec_inv)#
 print("iM(M(p)): ",p_vec_inv)#
 print("M(iM(M(v))):\n",V_vec)#
 print("M(iM(M(p))):\n",P_vec)#
-print("iM(M(T)): ",vs.realize(T_mat_inv))#
+print("iM(M(T)): ",vs.real(T_mat_inv))#
 print("iM(M(R)): ",R_mat_inv)#
-print("iM(M(T))(v): ",vs.realize(T_mat_inv(v)))#
+print("iM(M(T))(v): ",vs.real(T_mat_inv(v)))#
 print("iM(M(R))(p): ",R_mat_inv(p))#
-print("Diag(T) :\n",vs.realize(T.diag()))
-print("Jordan(T) :\n",vs.realize(T.jordan()[0]))
-print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT)))
-print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR),digits = 3))
-print("U:\n",vs.realize(vs.U(wBase,vBase),digits=3))
-print("mat: \n", mat)
-print("T from mat: ", mat_T)
-print("Diag(mat_T): \n", vs.realize(mat_T.diag()))
-print("Jordan(mat_T): \n", vs.realize(mat_T.jordan()[0]))
+print("Diag(T) :\n",vs.real(T.diag()))#
+print("M(T,e,f):\n",vs.real(vs.Mat(T,eT,fT)))#
+print("M(R,e,f):\n",vs.real(vs.Mat(R,eR,fR)))#
+print("U:\n",vs.real(vs.U(wBase,vBase)))#
+print("Jordan(T) :\n",vs.real(T.jordan()[0]))#
+print("mat: \n", mat)#
+print("T from mat: ", mat_T)#
+print("Diag(mat_T): \n", vs.real(mat_T.diag()))#
+print("Jordan(mat_T): \n", vs.real(mat_T.jordan()[0]))#
