@@ -91,6 +91,13 @@ class linMap:
         else:
             return linMap(lambda x: other*self.fun(x),self.V,self.W)
     __rmul__=__mul__
+    def __pow__(self,scalar):
+        if scalar == 0:
+            return eye(self.V)
+        if scalar == 1:
+            return self
+        return self*(self**(scalar-1))
+        
     def __truediv__(self,scalar):
         return linMap(lambda x: self.fun(x)/scalar,self.V,self.W)
     def __add__(self,other):
@@ -114,6 +121,8 @@ class linMap:
         else: return False
     def __ne__(self,other):
         return not (self == other)
+    def __neg__(self):
+        return -1*self
     def doc(self,document):
         self.fun.__doc__ = document
     def prod(self,other):
@@ -159,6 +168,8 @@ class linMap:
     def diag(self):
         eig_mlt, eigen = self.eig()
         return Mat(self,eigen,eigen)
+    def jordan(self):
+        return jordan(self)
     def adj(self):
         vBase = Gram(basis(self.V))
         wBase = Gram(basis(self.W))
@@ -210,6 +221,8 @@ class vector:
         else: return False
     def __ne__(self,other):
         return not (self == other)
+    def __neg__(self):
+        return -1*self
     def innerproduct(self,other):
         if re.match(r'F.',self.space):
             return sum(self.vec * other.vec)
@@ -320,7 +333,7 @@ def isindep(l):
     zero_idx = 0
     while l[zero_idx].norm() < tol: 
         zero_idx += 1
-        if zero_idx == len(l)-1 : break
+        if zero_idx == len(l)-1 or len(l) == 1: break
     for j in range(1,len(l)):
         if not isinstance(Matv(l[j],l[:j],indep_prompt=False),(int)): 
             return False
@@ -363,6 +376,27 @@ def getD(space):
 
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
+def jordan(self):
+    Base = []
+    n = getD(self.V)
+    I = eye(self.V)
+    eigen = self.eig()[0]
+    Null = [self-e[0]*I for e in eigen]
+    Idx = []
+    for N in Null:
+        V = (N**n).null()
+        for j in range(0,n+2):
+            Idx.append(_find_idx(V,lambda x: not isindep([(N**j)(x)])))
+        Index = [j-i for i,j in zip(Idx[:-1],Idx[1:])]
+        v_idx = Index[max(_find_idx(Index, lambda x: len(x) != 0))]
+        v_list = [[V[i]] for i in v_idx]
+        for v in v_list:
+            for j in range(n+1):
+                v.insert(0,N(v[0]))    
+        Base.append([mkindep(v) for v in v_list])
+    Base = sum(sum(Base,[]),[])
+    
+    return Mat(self,Base,Base),Base
 
 def realize(Obj,digits = 3, Tol = tol):
     if isinstance (Obj,(list)):
@@ -382,6 +416,12 @@ def realize(Obj,digits = 3, Tol = tol):
     if isinstance (Obj,(np.ndarray)):
         M = Obj.astype(np.complex)
         M = np.around(M,digits)
+        M[M==0.] = 0.
         if (abs(M.imag) < Tol).all():
             return np.real(M)
         return M
+    
+
+
+def _find_idx(lst, condition):
+    return set([i for i, elem in enumerate(lst) if condition(elem)])

@@ -124,6 +124,7 @@ print("iM(M(R)): ",R_mat_inv)#
 print("iM(M(T))(v): ",vs.realize(T_mat_inv(v)))#
 print("iM(M(R))(p): ",R_mat_inv(p))#
 print("Diag(T) :\n",vs.realize(T.diag()))
+print("Jordan(T) :\n",vs.realize(T.jordan()[0]))
 print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT)))
 print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR),digits = 3))
 print("U:\n",vs.realize(vs.U(wBase,vBase),digits=3))
