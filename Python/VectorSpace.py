@@ -83,6 +83,7 @@ class linMap:
         self.V = V
         self.W = W
     def __call__(self,v):
+        if isinstance(v,(list)) : return [self(vi) for vi in v]
         return vector(self.fun(v.vec),self.W)
     def __mul__(self,other):
         if type(self) == type(other):
@@ -276,6 +277,7 @@ def Matv(v,base, numer = True, indep_prompt = True):
         Eq = (Base_Poly-Vec_Poly).all_coeffs()
         Coef = sym.linsolve(Eq,c)
         
+
         if len(Coef) < 1 or len(Coef.free_symbols) > 0:
             if indep_prompt: 
                 print('Warning: Improper base! Returning 0')
@@ -384,7 +386,8 @@ def realize(Obj,digits = 3, Tol = tol):
         wBase = basis(Obj.W)
         return invMat(realize(Mat(Obj,vBase,wBase), digits, Tol),vBase,wBase)  
     if isinstance (Obj,(vector)):
-        return realize(Obj.vec,digits,Tol)
+        return vector(realize(Obj.vec,digits,Tol),Obj.space)
+    
     if isinstance(Obj,(sym.Basic)):
         if isinstance(Obj,(sym.Float)):
             return sym.Float(Obj,digits)

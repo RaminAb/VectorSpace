@@ -67,6 +67,10 @@ svT,eT,fT = T.svd()
 svR,eR,fR = R.svd()
 
 
+M = np.array([[0,1],[-1,0]])
+T_M = vs.invMat(M,vs.basis('F2'),vs.basis('F2'))
+R_M = vs.invMat(M,vs.basis('P1'),vs.basis('P1'))
+
 print("Basis (F2): ",vs.basis('F2'))#
 print("Basis (P1): ",vs.basis('P1'))#
 print("vList: ", vList)#
