@@ -99,15 +99,13 @@ class linMap:
         return linMap(lambda x: self.fun(x)-other.fun(x),self.V,self.W)
     def __str__(self):
         if re.match(r'F.',self.V):
-#            n = getD(self.V)
-#            z = sym.symbols('z0:%d'%n)
-            return 'lMap'
-#            return 'lMap({}->{}): {} ==> ({}) {}'.format(self.V,self.W,z, str(self.fun(z))[1:-1],self.fun.__doc__)
+            n = getD(self.V)
+            z = sym.symbols('z0:%d'%n)
+            return 'lMap({}->{}): {} ==> ({}) {}'.format(self.V,self.W,z,str(self.fun(z))[1:-1],self.fun.__doc__)
         if re.match(r'P.',self.V):
-#            n = getD(self.V)
-#            p = invMatv(np.ones(n),basis(self.V))
-            return 'lMap'
-#            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
+            n = getD(self.V)
+            p = invMatv(np.ones(n),basis(self.V))
+            return 'lMap({}->{}): {} ==> {} {}'.format(self.V,self.W,p,self(p),self.fun.__doc__)
     def __repr__(self):
         return str(self)
     def __eq__(self,other):
@@ -133,7 +131,10 @@ class linMap:
         return mkindep([self(v) for v in vBase])
     def eig(self):
         vBase = Gram(basis(self.V))
-        wBase = Gram(basis(self.V))
+        wBase = Gram(basis(self.W))
+        if len(vBase) != len(wBase):
+            print('This is not an operator! Returning 0')
+            return 0
         n = getD(self.V)
         M = Mat(self,vBase,wBase)
         eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
@@ -286,11 +287,13 @@ def Matv(v,base, indep_prompt = True):
         res = np.array(Coef.args[0])[:,np.newaxis].astype(dtype)
 
     if re.match(r'F.',base[0].space):
+
+        
         B = np.array([(b.vec).transpose() for b in base]).transpose()
         res = np.array(la.pinv(B).dot(v.vec[:,np.newaxis]))
         chk = B.dot(res)-v.vec[:,np.newaxis]
-        
-        if la.norm(chk) > tol:
+
+        if res.dtype != 'object' and la.norm(chk) > tol:
             if indep_prompt:
                 print('Warning: Improper base! Returning 0')
             return 0
@@ -382,15 +385,3 @@ def realize(Obj,digits = 3, Tol = tol):
         if (abs(M.imag) < Tol).all():
             return np.real(M)
         return M
-
-
-
-#def numerize(Mat):
-#    if isinstance(Mat,(list)):
-#        return [numerize(v) for v in Mat]
-#    if isinstance(Mat,(vector)):
-#        if isinstance (Mat.vec,(np.ndarray)):
-#            return vector((Mat.vec).astype('float'),Mat.space)
-#        if isinstance (Mat.vec,(sym.Basic)):
-#            return vector((Mat.vec).evalf(),Mat.space)
-#    return np.array(Mat).astype('float')
