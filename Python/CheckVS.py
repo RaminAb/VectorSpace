@@ -60,8 +60,8 @@ R_mat_inv = vs.invMat(R_mat,pBase,qBase)
 T_null = T.null()
 R_null = R.null()
 
-T_range = T.range()
-R_range = R.range()
+T_rnge = T.rnge()
+R_rnge = R.rnge()
 
 svT,eT,fT = T.svd()
 svR,eR,fR = R.svd()
@@ -96,8 +96,8 @@ print("T(v): ",w)#
 print("R(p): ",q)#
 print("Null(T): ",T_null)#
 print("Null(R): ",R_null)#
-print("Range(T): ",T_range)#
-print("Range(R): ",vs.realize(R_range))#
+print("Range(T): ",T_rnge)#
+print("Range(R): ",vs.realize(R_rnge))#
 print("T.inv(): ", T.inv())#
 print("T*T.inv(): ",T*T.inv())
 print("T.pinv(): ", vs.realize(T.pinv()))#
@@ -128,8 +128,7 @@ print("Jordan(T) :\n",vs.realize(T.jordan()[0]))
 print("M(T,e,f):\n",vs.realize(vs.Mat(T,eT,fT)))
 print("M(R,e,f):\n",vs.realize(vs.Mat(R,eR,fR),digits = 3))
 print("U:\n",vs.realize(vs.U(wBase,vBase),digits=3))
-
-
 print("mat: \n", mat)
 print("T from mat: ", mat_T)
 print("Diag(mat_T): \n", vs.realize(mat_T.diag()))
+print("Jordan(mat_T): \n", vs.realize(mat_T.jordan()[0]))
