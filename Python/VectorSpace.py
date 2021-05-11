@@ -135,32 +135,105 @@ class linMap:
         Map = linMap(lambda x: self.fun(other.fun(x)),other.V,self.W)
         Map.fun.__doc__ = ""
         return Map
-    def null(self):
-        return null(self)
-    def rnge(self):
-        return rnge(self)
-    def eig(self):
-        return eig(self)
-    def trace(self):
-        return trace(self)
-    def det(self):
-        return det(self)
-    def char(self):
-        return char(self)
-    def poly(self):
-        return poly(self)
-    def diag(self):
-        return diag(self)
-    def jordan(self):
-        return jordan(self)
-    def adj(self):
-        return adj(self)
-    def inv(self):
-        return inv(self)
-    def pinv(self):
-        return pinv(self)
-    def svd(self):
-        return svd(self)
+    def null(T):
+        vBase = Gram(basis(T.V))
+        wBase = Gram(basis(T.W))
+        N = la.null_space(Mat(T,vBase,wBase)).transpose()
+        if N.size == 0 : return [zerov(T.V)]
+        return [invMatv(M,vBase) for M in N]
+    def rnge(T):
+        vBase = basis(T.V)
+        return mkindep([T(v) for v in vBase])
+    def eig(T):
+        vBase = Gram(basis(T.V))
+        wBase = Gram(basis(T.W))
+        if len(vBase) != len(wBase):
+            print('This is not an operator! Returning 0')
+            return 0
+        n = getD(T.V)
+        M = Mat(T,vBase,wBase)
+        eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
+        eigen_vec = []
+        eig_mlt = []
+        for ev,algmlt in zip(eigen_val,alg_mlt):
+            nill = M - ev*np.eye(n)
+            geo_mlt = la.null_space(nill,rcond=tol).shape[1]
+            eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt),rcond=tol))
+            eig_mlt.append((ev,algmlt,geo_mlt))
+        eigen_vec = np.concatenate(eigen_vec,axis=1)
+        eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
+        return eig_mlt,eigen
+    
+    def trace(T):
+        return sum([ev[1]*ev[0] for ev in T.eig()[0]])
+    def det(T):
+        return np.prod(np.array([ev[0]**ev[1] for ev in T.eig()[0]]))
+    def char(T):
+        z = sym.symbols('z')
+        poly = [(z-ev[0])**ev[1] for ev in T.eig()[0]]
+        return sym.expand(np.prod(np.array(poly)))
+    
+    def poly(T):
+        z = sym.symbols('z')
+        poly = [(z-ev[0])**ev[1] for ev in T.jordan()[2]]
+        return sym.expand(np.prod(np.array(poly)))
+    
+    def diag(T):
+        eig_mlt, eigen = T.eig()
+        return Mat(T,eigen,eigen)
+    def jordan(T):
+        Base = []
+        n = getD(T.V)
+        I = eye(T.V)
+        eigen = T.eig()[0]
+        min_deg = []
+        for e in eigen:
+            N = T-e[0]*I
+            Idx = []
+            V = (N**n).null()
+            for j in range(0,n+2):
+                Idx.append(_find_idx(V,lambda x: not isindep([(N**j)(x)])))
+            Index = [j-i for i,j in zip(Idx[:-1],Idx[1:])]
+            min_deg.append((e[0],len(list(_find_idx(Index, lambda x: len(x) != 0)))))
+            v_idx = sum([list(i) for i in Index],[])[::-1]
+            v_list = [[V[i]] for i in v_idx]
+            for v in v_list:
+                for j in range(n+1):
+                    v.insert(0,N(v[0]))
+            Base.append([mkindep(v) for v in v_list])
+        Base = mkindep(sum(sum(Base,[]),[]))
+        return Mat(T,Base,Base),Base,min_deg
+    def adj(T):
+        vBase = Gram(basis(T.V))
+        wBase = Gram(basis(T.W))
+        return invMat(Mat(T,vBase,wBase).transpose().conjugate(),wBase,vBase)
+    def inv(T):
+        if not isbij(T):
+            print("Linear Map not invertible! Returning 0")
+            return 0
+        vBase = Gram(basis(T.V))
+        wBase = Gram(basis(T.W))
+        return invMat(la.inv(Mat(T,vBase,wBase)),wBase,vBase)    
+    def pinv(T):
+        vBase = Gram(basis(T.V))
+        wBase = Gram(basis(T.W))
+        return invMat(la.pinv(Mat(T,vBase,wBase)),wBase,vBase)  
+    def svd(T):
+        ev_right = (T.adj().prod(T)).eig()
+        ev_left = (T.prod(T.adj())).eig()
+        singular = sum([[ev]*ev[1] for ev in ev_right[0]],[])
+        sv = [np.sqrt(ev[0]) for ev in singular]
+        e = ev_right[1]
+        f = ev_left[1]
+        return sv,e,f
+    def polar(T):
+        sv,e,f = T.svd()
+        Scale = invMat(np.diag(sv),e,e)
+        T_ef = np.around(Mat(T,e,f),tol_int)
+        T_ef[T_ef > 0] =  1
+        T_ef[T_ef < 0] = -1
+        Isometry = invMat(T_ef,e,f)
+        return Isometry,Scale
 
 
 class vector:
@@ -370,110 +443,6 @@ def U(vBase,wBase):
 
 
 #========================================================================= 
-# Linear Map Methods/Functions
-#========================================================================= 
-def null(T):
-    vBase = Gram(basis(T.V))
-    wBase = Gram(basis(T.W))
-    N = la.null_space(Mat(T,vBase,wBase)).transpose()
-    if N.size == 0 : return [zerov(T.V)]
-    return [invMatv(M,vBase) for M in N]
-def rnge(T):
-    vBase = basis(T.V)
-    return mkindep([T(v) for v in vBase])
-def eig(T):
-    vBase = Gram(basis(T.V))
-    wBase = Gram(basis(T.W))
-    if len(vBase) != len(wBase):
-        print('This is not an operator! Returning 0')
-        return 0
-    n = getD(T.V)
-    M = Mat(T,vBase,wBase)
-    eigen_val, alg_mlt = np.unique(la.eigvals(M),return_counts=True)
-    eigen_vec = []
-    eig_mlt = []
-    for ev,algmlt in zip(eigen_val,alg_mlt):
-        nill = M - ev*np.eye(n)
-        geo_mlt = la.null_space(nill,rcond=tol).shape[1]
-        eigen_vec.append(la.null_space(np.linalg.matrix_power(nill,algmlt),rcond=tol))
-        eig_mlt.append((ev,algmlt,geo_mlt))
-    eigen_vec = np.concatenate(eigen_vec,axis=1)
-    eigen =[invMatv(vec[:,np.newaxis],vBase) for vec in eigen_vec.transpose()]
-    return eig_mlt,eigen
-
-def trace(T):
-    return sum([ev[1]*ev[0] for ev in T.eig()[0]])
-def det(T):
-    return np.prod(np.array([ev[0]**ev[1] for ev in T.eig()[0]]))
-def char(T):
-    z = sym.symbols('z')
-    poly = [(z-ev[0])**ev[1] for ev in T.eig()[0]]
-    return sym.expand(np.prod(np.array(poly)))
-
-def poly(T):
-    z = sym.symbols('z')
-    poly = [(z-ev[0])**ev[1] for ev in T.jordan()[2]]
-    return sym.expand(np.prod(np.array(poly)))
-
-def diag(T):
-    eig_mlt, eigen = T.eig()
-    return Mat(T,eigen,eigen)
-def jordan(T):
-    Base = []
-    n = getD(T.V)
-    I = eye(T.V)
-    eigen = T.eig()[0]
-    min_deg = []
-    for e in eigen:
-        N = T-e[0]*I
-        Idx = []
-        V = (N**n).null()
-        for j in range(0,n+2):
-            Idx.append(_find_idx(V,lambda x: not isindep([(N**j)(x)])))
-        Index = [j-i for i,j in zip(Idx[:-1],Idx[1:])]
-        min_deg.append((e[0],len(list(_find_idx(Index, lambda x: len(x) != 0)))))
-        v_idx = sum([list(i) for i in Index],[])[::-1]
-        v_list = [[V[i]] for i in v_idx]
-        for v in v_list:
-            for j in range(n+1):
-                v.insert(0,N(v[0]))
-        Base.append([mkindep(v) for v in v_list])
-    Base = mkindep(sum(sum(Base,[]),[]))
-    return Mat(T,Base,Base),Base,min_deg
-def adj(T):
-    vBase = Gram(basis(T.V))
-    wBase = Gram(basis(T.W))
-    return invMat(Mat(T,vBase,wBase).transpose().conjugate(),wBase,vBase)
-def inv(T):
-    if not isbij(T):
-        print("Linear Map not invertible! Returning 0")
-        return 0
-    vBase = Gram(basis(T.V))
-    wBase = Gram(basis(T.W))
-    return invMat(la.inv(Mat(T,vBase,wBase)),wBase,vBase)    
-def pinv(T):
-    vBase = Gram(basis(T.V))
-    wBase = Gram(basis(T.W))
-    return invMat(la.pinv(Mat(T,vBase,wBase)),wBase,vBase)  
-def svd(T):
-    ev_right = (T.adj().prod(T)).eig()
-    ev_left = (T.prod(T.adj())).eig()
-    singular = sum([[ev]*ev[1] for ev in ev_right[0]],[])
-    sv = [np.sqrt(ev[0]) for ev in singular]
-    e = ev_right[1]
-    f = ev_left[1]
-    return sv,e,f
-def polar(T):
-    sv,e,f = T.svd()
-    Scale = invMat(np.diag(sv),e,e)
-    T_ef = np.around(Mat(T,e,f),tol_int)
-    T_ef[T_ef > 0] =  1
-    T_ef[T_ef < 0] = -1
-    Isometry = invMat(T_ef,e,f)
-    return Isometry,Scale
-    
-
-#========================================================================= 
 # Utilities
 #========================================================================= 
 def real(Obj,digits = 3, Tol = tol):
@@ -503,6 +472,5 @@ def real(Obj,digits = 3, Tol = tol):
 #========================================================================= 
 def _find_idx(lst, condition):
     return set([i for i, elem in enumerate(lst) if condition(elem)])
-def _isF(space):
-    pass
+
     
