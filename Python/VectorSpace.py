@@ -63,7 +63,6 @@ mkindep(l) - Reduces a list of vectors into a list of independent vectors
 mkbasis(l) - Turns (reduce or extend) a list into a basis
 getD(space) - returns the dimension of 'space'
 U(vBase,wBase) - returns the Unitary transformation from 'vBase' to 'wBase'
-numerize(Mat) - turns the sympy matrix into numpy array
 real(Mat) - rounds small floats to zero
 """
 
@@ -72,7 +71,8 @@ import numpy as np
 import scipy.linalg as la
 import re
 sym.init_printing(pretty_print=False)
-tol = 1e-6
+tol = 1e-8
+tol_int = int(str(tol)[-1])
 #========================================================================= 
 # Classes
 #========================================================================= 
@@ -124,6 +124,13 @@ class linMap:
         return -1*self
     def doc(self,document):
         self.fun.__doc__ = document
+    def riesze(self):
+        base = Gram(basis(self.V))
+        if re.match(r'F.',self.V):
+            l = [self(v)[0].conjugate()*v for v in base]
+        if re.match(r'P.',self.V):
+            l = [self(v).vec*v for v in base]
+        return sum(l,zerov(base[0].space))
     def prod(self,other):
         Map = linMap(lambda x: self.fun(other.fun(x)),other.V,self.W)
         Map.fun.__doc__ = ""
@@ -155,15 +162,20 @@ class linMap:
     def svd(self):
         return svd(self)
 
+
 class vector:
-    def __init__(self,array,space):
+    def __init__(self,array,space, product = 'std'):
         if re.match(r'F.',space):
             self.vec = np.array(array)
         if re.match(r'P.',space):
             self.vec = array
         self.space = space
-    def __mul__(self,scalar):
-        return vector(self.vec*scalar,self.space)
+        self.product = product
+    def __mul__(self,other):
+        if type(self) == type(other):
+            return self.innerproduct(other)
+        else:
+            return vector(self.vec*other,self.space)
     __rmul__=__mul__
     def __truediv__(self,scalar):
         return self*(1/scalar)
@@ -185,11 +197,17 @@ class vector:
         return not (self == other)
     def __neg__(self):
         return -1*self
+    def __getitem__(self,index):
+        return self.vec[index]
+    def __setitem__(self,index,data):
+        self.vec[index] = data
     def innerproduct(self,other):
-        if re.match(r'F.',self.space):
-            return (self.vec.transpose().conjugate()).dot(other.vec)
-        if re.match(r'P.',self.space):
-            return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-1,1))
+        if self.product == 'std':
+            if re.match(r'F.',self.space):
+                return (self.vec.transpose().conjugate()).dot(other.vec)
+            if re.match(r'P.',self.space):
+                return sym.integrate(self.vec*other.vec,(sym.symbols('x'),-np.pi,np.pi))
+        return self.product(self.vec,other.vec)
     def norm(self):
         if re.match(r'F.',self.space): return np.sqrt(self.innerproduct(self))
         if re.match(r'P.',self.space): return sym.sqrt(self.innerproduct(self))
@@ -239,7 +257,15 @@ def Gram(base):
                     for j in range(i)],base[0].initial())).normalize()
     return eBase
 
+def dual(base):
+    n = getD(base[0].space)
+    if re.match(r'F.',base[0].space): scalar_base = basis('F1')
+    if re.match(r'P.',base[0].space): scalar_base = basis('P0')
+    I = np.eye(n)
+    return [invMat(I[j,:],base,scalar_base) for j in range(n)]
+
 def Matv(v,base, indep_prompt = True):
+    if isinstance (v,(list)): return [Matv(i,base, indep_prompt = True) for i in v]
     if re.match(r'P.',base[0].space):
         n = len(base)
         c = sym.symbols('c0:{}'.format(n))
@@ -276,14 +302,17 @@ def Matv(v,base, indep_prompt = True):
         
 
 def invMatv(mat,base):
+    if isinstance (mat,(list)): return [invMatv(i,base) for i in mat]
     vec = sum([(mat[i]*base[i].vec) for i in range(len(base))])
     if re.match(r'F.',base[0].space): return vector(vec,base[0].space)
     if re.match(r'P.',base[0].space): return vector(sym.Matrix([vec])[0],base[0].space)
 
 def Mat(lMap,vBase,wBase):
+    if isinstance (lMap,(list)): return [Mat(i,vBase,wBase) for i in lMap]
     return np.concatenate([Matv(lMap(VBase),wBase) for VBase in vBase],axis=1)
 
 def invMat(mat,vBase,wBase, doc = ""):
+    if isinstance (mat,(list)): return [invMat(i,vBase,wBase, doc = "") for i in mat]
     def F(x):
         F.__doc__ = doc
         vx = vector(x,vBase[0].space)
@@ -332,9 +361,9 @@ def isbij(T):
 
 def getD(space):
     if re.match(r'F.',space):
-        return int(re.search(r'\d',space).group())
+        return int(''.join(re.findall(r'\d',space)))
     if re.match(r'P.',space):
-        return int(re.search(r'\d',space).group())+1
+        return int(''.join(re.findall(r'\d',space)))+1
 
 def U(vBase,wBase):
     return Mat(eye(vBase[0].space),vBase,wBase)
@@ -427,12 +456,22 @@ def pinv(T):
     wBase = Gram(basis(T.W))
     return invMat(la.pinv(Mat(T,vBase,wBase)),wBase,vBase)  
 def svd(T):
-    sv_right = (T.adj().prod(T)).eig() 
-    sv_left = (T.prod(T.adj())).eig()
-    sv = [np.sqrt(ev[0]) for ev in sv_right[0]]
-    e = sv_right[1]
-    f = sv_left[1]
+    ev_right = (T.adj().prod(T)).eig()
+    ev_left = (T.prod(T.adj())).eig()
+    singular = sum([[ev]*ev[1] for ev in ev_right[0]],[])
+    sv = [np.sqrt(ev[0]) for ev in singular]
+    e = ev_right[1]
+    f = ev_left[1]
     return sv,e,f
+def polar(T):
+    sv,e,f = T.svd()
+    Scale = invMat(np.diag(sv),e,e)
+    T_ef = np.around(Mat(T,e,f),tol_int)
+    T_ef[T_ef > 0] =  1
+    T_ef[T_ef < 0] = -1
+    Isometry = invMat(T_ef,e,f)
+    return Isometry,Scale
+    
 
 #========================================================================= 
 # Utilities
@@ -464,3 +503,6 @@ def real(Obj,digits = 3, Tol = tol):
 #========================================================================= 
 def _find_idx(lst, condition):
     return set([i for i, elem in enumerate(lst) if condition(elem)])
+def _isF(space):
+    pass
+    
